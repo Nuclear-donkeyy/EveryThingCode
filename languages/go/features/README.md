@@ -44,6 +44,28 @@ Go 不把取消做成隐藏的全局状态，而是把 `context` 作为参数显
 
 Go 采用显式 `error`，是为了让控制流、资源释放和错误上下文都在代码中可见。代价是要写更多 `if err != nil`，但收益是边界清晰。学习者应该观察 `examples/interfaces-composition/` 和 `examples/context-cancellation/`：前者在发送失败时用 `%w` 包装错误，后者保留 `context deadline exceeded`，便于上层用 `errors.Is` 判断原因。
 
+## 深入理解与对比练习
+
+### 简单不是少写代码，而是少隐藏规则
+
+Go 的语法有意保持小而明确：没有异常、没有继承、没有隐式构造器，也很少使用魔法式元编程。这让代码看起来朴素，但优势是调用路径、错误路径和并发边界容易追踪。学习时不要急着把其他语言的抽象搬进来。运行每个例子后，尝试指出数据从哪里进入、错误在哪里返回、goroutine 在哪里退出；如果这些问题答不出来，抽象就已经过度了。
+
+### 接口由使用方定义
+
+Go 的接口常常应该出现在消费者一侧，而不是实现者一侧。函数只声明自己需要的最小能力，例如 `io.Reader`、`fmt.Stringer` 或一个本地小接口。学习 `interfaces-composition` 时，可以新增一个结构体，只要它拥有同名方法，就能被现有函数使用；无需显式 `implements`。这种隐式实现让组合很轻，但也要求接口保持小，否则会变成脆弱的“万能对象”。
+
+### goroutine 要有退出路径
+
+启动 goroutine 很便宜，但不是免费的。没有退出条件、没有结果收集、没有取消信号的 goroutine 会让程序行为越来越难推理。学习 `goroutines-channels` 时，观察 channel 如何让任务结果回到主流程；再故意移除接收逻辑，思考发送方为什么会阻塞。这个练习比单纯记住 `go func()` 更重要，因为真实服务的问题往往出在生命周期管理。
+
+### context 是跨边界的取消协议
+
+`context.Context` 不是普通参数包，也不应该滥用来传业务数据。它的核心作用是携带取消、超时和请求范围的元数据，让数据库、HTTP 调用和内部任务在同一条请求链路上及时收束。学习 `context-cancellation` 时，可以缩短 timeout，观察任务如何提前返回；再去掉 `select` 中的 `ctx.Done()`，体会为什么没有取消检查的 goroutine 不能被外部温和停止。
+
+### error 返回让失败成为流程的一部分
+
+Go 要求显式检查 `error`，这看起来重复，却迫使你在每个边界决定是否恢复、包装还是向上返回。好的 Go 错误处理会携带上下文，例如 `fmt.Errorf("load config: %w", err)`，而不是只打印字符串。改造例子时，可以给接口实现增加一个失败分支，并用 `errors.Is` 或错误包装说明调用方如何判断可恢复错误。
+
 ## 教学例子索引
 
 - [interfaces-composition](examples/interfaces-composition/)：用小接口、struct 组合和显式 error 表达可替换依赖。

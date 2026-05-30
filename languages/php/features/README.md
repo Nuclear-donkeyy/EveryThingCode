@@ -26,6 +26,28 @@ Composer 与 autoload 的核心思想是“类名映射到文件，依赖由项�
 | Composer/autoload 思想 | 避免手写大量 `require`，让包、类和文件组织可预测。 | PHP 运行时提供 `spl_autoload_register`，Composer 在此基础上生成自动加载器并按 PSR-4 映射命名空间。 | `collections-arrays` 的 README 会提示真实项目如何把对象移动到 `src/` 并交给 Composer autoload。 |
 | Throwable 错误模型 | 把业务失败、类型错误和系统错误放到统一的捕获边界中处理。 | PHP 7 以后用 `Throwable` 作为 `Exception` 与 `Error` 的共同接口，让应用能统一记录、恢复或转换响应。 | `throwable-recovery` 区分可恢复的业务异常、类型错误和最终清理逻辑。 |
 
+## 深入理解与对比练习
+
+### PHP 的核心场景是请求生命周期
+
+很多 PHP 设计都围绕 Web 请求展开：请求进入、加载代码、执行业务、返回响应、释放进程内状态。学习 PHP 时不要只看语法，要理解“每个请求天然有边界”带来的好处和限制。好处是状态泄漏相对少，部署模型直接；限制是长任务、连接复用和实时通信通常需要队列、常驻进程或框架支持。阅读例子时，尝试把每个脚本想象成一次 HTTP 请求的核心业务片段。
+
+### strict_types 是边界态度
+
+PHP 现代类型系统能显著提升可维护性，但默认仍照顾历史兼容。`declare(strict_types=1)` 表达的是一种团队态度：在本文件里，函数边界不做宽松转换。学习 `strict-types-value-objects` 时，可以传入字符串数字或非法金额，观察严格类型和构造校验分别负责什么。类型检查防止形状错误，领域校验防止业务错误，两者不能互相替代。
+
+### 数组强大，也容易变成隐式结构
+
+PHP array 同时承担列表、映射和轻量结构体的角色，非常方便，但跨函数传递时容易丢失约定。学习 `collections-arrays` 时，先观察 `array_map`、`array_filter` 等函数如何表达数据流；再思考哪些数据应该升级成对象或 DTO。判断标准很实用：如果字段名被多个模块依赖、需要校验或有行为，就不要长期停留在裸数组里。
+
+### Composer/autoload 改变了组织代码的方式
+
+即使例子不引入 Composer，也要理解现代 PHP 不是靠手写一串 `require` 组织大型项目。Composer 的自动加载和 PSR 规范让命名空间、目录结构和依赖声明建立对应关系。学习当前标准库例子时，可以想象每个 value object、service、exception 将来会进入哪个命名空间。这个心智模型会让你更容易理解 Laravel 和 Symfony 的工程结构。
+
+### Throwable 让错误体系更完整
+
+现代 PHP 中，`Exception` 和 `Error` 都实现 `Throwable`。业务可恢复失败通常用自定义异常表达，类型错误、解析错误等则更偏程序缺陷。学习 `throwable-recovery` 时，可以分别制造业务异常和类型错误，观察应该捕获到哪一层。真实项目不要在业务深处吞掉所有 `Throwable`；更常见的做法是在框架边界统一记录日志、转换响应。
+
 ## 教学例子索引
 
 - [strict-types-value-objects](examples/strict-types-value-objects/)：用金额值对象、类型签名和 `strict_types` 观察现代 PHP 如何把错误挡在边界。

@@ -44,6 +44,32 @@ Flutter 让 Dart 变得知名，但 Dart 不是只能写 widget。进入 Flutter
 - Dart 为什么这样解决：Flutter 的声明式 UI 大量依赖 Dart 语言基础：构造函数和命名参数让 widget 树可读，`final` 和 `const` 帮助表达不可变对象，集合 `if`/`for` 适合构造子组件列表，`Future`/`Stream` 对应远端数据与持续事件。先学语言，会让后面的框架概念更有落点。
 - 学习者应该观察哪个例子：三个例子都不使用 Flutter；先把类型、异步和组合方式跑通，再回到 Flutter 时就能把 widget 当作 Dart 对象来理解。
 
+## 深入理解与对比练习
+
+### Dart 是 Flutter 之前的一门完整语言
+
+很多人从 Flutter 认识 Dart，于是只把它当作 Widget 语法载体。实际上 Dart 的 null safety、Future/Stream、extension、mixin、isolate 和包管理都值得单独学习。语言基础越清楚，写 Flutter 时越容易理解状态、异步加载、事件流和组件组合。运行这些例子时，可以暂时忘掉 UI，专注观察数据和异步边界。
+
+### sound null safety 把缺失变成类型事实
+
+Dart 的空安全是 sound 的：如果一个变量类型不是可空，编译器就能相信它不会是 null。学习 `null-safety-results` 时，可以尝试把可空值直接传给非空参数，观察需要显式判断或提供默认值。这个机制的价值不是减少几个 `if`，而是让模型入口处就决定哪些字段必须存在、哪些字段允许缺失。
+
+### Future 是一次结果，Stream 是一串结果
+
+`Future<T>` 表示未来某个时刻完成一次，`Stream<T>` 表示随时间到来的多个值。学习 `future-streams` 时，先观察 Future 的等待，再观察 Stream 的 `await for`。把传感器、按钮点击、文件下载进度想象成 Stream，把一次 HTTP 响应想象成 Future，你会更容易判断真实 Flutter 代码里该用哪种抽象。
+
+### isolate 是并行和隔离的边界
+
+Dart 的 isolate 不共享内存，通过消息传递通信。这和很多语言的共享线程模型不同：它降低数据竞争风险，但也要求数据跨边界复制或转移。即使当前例子不启动 isolate，也要理解这个思想：CPU 密集任务不应该阻塞 UI isolate，跨 isolate 的数据必须设计消息协议。后续可以把大计算从主流程拆到 isolate 作为进阶练习。
+
+### mixin 和 extension 分别解决复用和表达
+
+mixin 适合把一组可复用行为组合进类，extension 适合在不修改原类型的情况下增加调用表达。学习 `extensions-mixins` 时，观察哪些行为属于对象能力，哪些只是调用便利。过度 mixin 会让行为来源难追踪，过度 extension 会让 API 看似无处不在。好的使用方式应该让领域表达更清楚，而不是制造隐形依赖。
+
+### Flutter 状态管理依赖语言基础
+
+Widget rebuild、异步加载、表单校验和状态流动都离不开 Dart 基础。Optional 风格的可空值决定加载状态，Future/Stream 决定异步数据形态，class/mixin/extension 决定模型组织。学完这些例子后，可以尝试把一个“加载中/成功/失败”的 UI 状态建成 sealed class，再思考它如何映射到 Flutter 页面。
+
 ## 教学例子索引
 
 - [null-safety-results](examples/null-safety-results/)：用 sound null safety、sealed class 和模式匹配表达缺失值与业务结果。

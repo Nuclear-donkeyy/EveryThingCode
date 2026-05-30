@@ -9,11 +9,12 @@ REQUIRED_FEATURE_HEADINGS = [
     "## 如何使用",
     "## 思想总览",
     "## 核心特性地图",
+    "## 深入理解与对比练习",
     "## 教学例子索引",
     "## 学习检查",
 ]
 REQUIRED_EXAMPLE_HEADINGS = ["## 目标", "## 运行", "## 观察点"]
-MIN_FEATURE_CHARS = 1200
+MIN_FEATURE_CHARS = 2200
 MIN_EXAMPLES = 3
 
 
