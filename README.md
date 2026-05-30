@@ -12,7 +12,7 @@
 
 1. 先阅读一门语言的 `languages/<language>/README.md`，理解类型系统、错误处理、并发模型和工程化方式。
 2. 运行该语言的 3 个基础案例：`hello`、`data-flow`、`errors`。
-3. 再进入 `frameworks/<language>/<framework>/README.md`，学习框架核心思想和最小项目结构。
+3. 再进入 [`frameworks/`](frameworks/) 和 `frameworks/<language>/<framework>/README.md`，学习框架核心思想和最小项目结构。
 4. 横向比较不同语言在同一类问题上的表达方式，例如数据建模、错误恢复、HTTP API。
 
 ## 语言目录
@@ -65,6 +65,8 @@
 ```bash
 python3 scripts/verify_versions.py
 python3 scripts/run_smoke_tests.py --dry-run
+python3 scripts/verify_framework_modules.py
+python3 scripts/run_framework_examples.py --dry-run
 ```
 
 `run_smoke_tests.py` 默认只检查案例结构和运行命令；加上 `--execute` 后会尝试运行本机已经安装的语言工具链案例。

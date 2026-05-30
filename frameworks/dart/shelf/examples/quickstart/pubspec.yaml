@@ -1,0 +1,13 @@
+name: everythingcode_shelf_quickstart
+description: A minimal Shelf API for EverythingCode.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+
+dependencies:
+  shelf: ^1.4.0
+
+dev_dependencies:
+  test: ^1.25.0
