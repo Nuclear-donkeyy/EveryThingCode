@@ -127,6 +127,7 @@ CI 中常见流水线是安装 Flutter SDK、缓存 Pub 依赖、运行 `flutter
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：学习任务面板，展示 `runApp`、`MaterialApp`、`StatefulWidget`、`setState`、布局组合和 Widget test。
 
 ## 版本来源

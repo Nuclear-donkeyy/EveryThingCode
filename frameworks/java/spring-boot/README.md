@@ -144,6 +144,7 @@ Spring Boot 的优势是生态稳定、资料多、企业集成能力强；代�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小 REST API 项目，包含任务列表查询、创建任务、按 id 查询、MockMvc 测试和可复制运行命令。
 
 ## 版本来源

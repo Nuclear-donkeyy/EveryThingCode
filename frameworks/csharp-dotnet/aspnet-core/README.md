@@ -217,6 +217,7 @@ dotnet publish -c Release
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：真实可运行的 ASP.NET Core Minimal API 项目，演示 middleware pipeline、DI、Options、路由分组、服务层、内存仓储和 JSON 响应。
 
 ## 版本来源

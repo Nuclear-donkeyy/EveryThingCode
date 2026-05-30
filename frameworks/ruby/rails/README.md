@@ -134,6 +134,7 @@ quickstart 的第一验收以启动服务和 curl 请求为主。后续可加入
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小 Rails 风格任务 API，展示 Rack 入口、应用配置、路由、控制器和模型。
 
 ## 版本来源

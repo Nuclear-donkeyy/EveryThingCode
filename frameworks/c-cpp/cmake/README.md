@@ -104,6 +104,7 @@ CMake 适合跨平台 C/C++ 工程、需要 IDE 生成器支持的项目、依�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：C++23 命令行程序，演示现代 CMake target 模型和 out-of-source build。
 
 ## 版本来源

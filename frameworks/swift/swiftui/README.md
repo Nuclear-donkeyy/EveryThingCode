@@ -116,6 +116,7 @@ SwiftUI 应用的部署路径取决于平台。iOS、watchOS、visionOS 应用�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：列表 UI 的最小 Swift Package，展示 `App` 入口、状态模型、`@State`、`@Binding`、环境值和列表交互。
 
 ## 版本来源

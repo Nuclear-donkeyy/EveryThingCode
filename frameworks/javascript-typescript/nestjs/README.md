@@ -126,6 +126,7 @@ NestJS 的主要取舍是结构换复杂度。它会让小项目显得“文件�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：模块化 API 最小项目，包含根模块、业务模块、控制器、Provider、DTO、管道、守卫和可本地执行的 smoke test。
 
 ## 版本来源

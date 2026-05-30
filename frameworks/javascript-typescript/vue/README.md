@@ -92,6 +92,7 @@ Vue 适合希望保留模板可读性、渐进式接入、团队成员前端背�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：任务面板，展示 `ref`、`computed`、模板事件和 SFC。
 
 ## 版本来源

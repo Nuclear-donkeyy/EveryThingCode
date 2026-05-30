@@ -137,6 +137,7 @@ Django 部署前需要特别关注 `DEBUG=False`、`ALLOWED_HOSTS`、密钥、�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：用内存 notes API 演示 Django 项目结构、URLConf、View、测试客户端和本地启动命令。
 
 ## 版本来源

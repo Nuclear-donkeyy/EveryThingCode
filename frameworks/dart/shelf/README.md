@@ -123,6 +123,7 @@ Shelf 本身没有部署平台绑定，可以部署到 VM、容器、Kubernetes�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：内存 tasks API，展示 `Handler`、`Middleware`、`Pipeline`、JSON 响应、环境变量端口和 handler 级测试。
 
 ## 版本来源

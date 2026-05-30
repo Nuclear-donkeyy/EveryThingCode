@@ -87,6 +87,7 @@ React 适合组件复杂、交互密集、生态要求高、团队熟悉 TypeScr
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：任务看板 SPA，展示组件拆分、状态提升、派生数据、事件更新和离线 smoke。
 
 ## 版本来源

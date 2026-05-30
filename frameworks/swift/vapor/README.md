@@ -117,6 +117,7 @@ Vapor 服务可以直接以 release 二进制运行，也可以构建 Docker 镜
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小 Vapor JSON API，展示路由分组、中间件、`Request` 解码、DTO 响应、内存 repository 和 async handler。
 
 ## 版本来源

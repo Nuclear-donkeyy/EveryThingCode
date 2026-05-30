@@ -100,6 +100,7 @@ Qt 适合长期维护的跨平台桌面应用、工业软件、设备控制台�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：Qt Core 控制台事件驱动程序，演示 QObject、信号槽、事件循环和 CMake `AUTOMOC`。
 
 ## 版本来源

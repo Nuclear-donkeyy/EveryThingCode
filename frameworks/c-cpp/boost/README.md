@@ -96,6 +96,7 @@ Boost 适合需要成熟、跨平台、泛型 C++ 能力的项目，尤其是标
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：Boost header-only 小程序，演示字符串算法、small_vector、lexical_cast 和 CMake 依赖查找。
 
 ## 版本来源

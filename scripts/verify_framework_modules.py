@@ -55,6 +55,17 @@ EXAMPLE_SECTIONS = [
     "## 验收",
 ]
 
+CORE_IDEAS_SECTIONS = [
+    "## 目标",
+    "## 对应的问题",
+    "## 核心思想到代码",
+    "## 代码位置",
+    "## 运行",
+    "## 观察点",
+    "## 修改练习",
+    "## 验收",
+]
+
 
 def missing_sections(text: str, sections: list[str]) -> list[str]:
     return [section for section in sections if section not in text]
@@ -80,6 +91,14 @@ def has_bash_command(text: str) -> bool:
 def example_has_project_files(path: Path) -> bool:
     ignored = {"README.md", "NOTES.md"}
     return any(child.is_file() and child.name not in ignored for child in path.rglob("*"))
+
+
+def has_non_bash_code_block(text: str) -> bool:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```") and stripped not in {"```", "```bash", "```text"}:
+            return True
+    return False
 
 
 def main() -> int:
@@ -124,6 +143,22 @@ def main() -> int:
                 failures.append(f"{example_readme.relative_to(ROOT)} is too thin for example teaching")
             if not example_has_project_files(example):
                 failures.append(f"{example.relative_to(ROOT)} has no project/source files")
+
+            core = framework_dir / "examples" / "core-ideas" / "README.md"
+            if not core.exists():
+                failures.append(f"{core.relative_to(ROOT)} missing")
+                continue
+            core_text = core.read_text(encoding="utf-8")
+            for section in missing_sections(core_text, CORE_IDEAS_SECTIONS):
+                failures.append(f"{core.relative_to(ROOT)} missing {section}")
+            if not has_bash_command(core_text):
+                failures.append(f"{core.relative_to(ROOT)} missing runnable bash command")
+            if not has_non_bash_code_block(core_text):
+                failures.append(f"{core.relative_to(ROOT)} missing framework code snippet")
+            if "../quickstart/" not in core_text:
+                failures.append(f"{core.relative_to(ROOT)} does not link quickstart source files")
+            if "examples/core-ideas/" not in text:
+                failures.append(f"{readme.relative_to(ROOT)} does not link core-ideas example")
 
     if failures:
         for failure in failures:

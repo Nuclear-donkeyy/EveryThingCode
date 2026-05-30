@@ -143,6 +143,7 @@ Axum 应用最终是一个 Rust 二进制。基础部署方式是：
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：使用 Axum、Tokio、Serde 和内存状态构建笔记 API，包含 `GET /health`、`GET /notes`、`GET /notes/{id}`、`POST /notes` 和可运行测试。
 
 ## 版本来源

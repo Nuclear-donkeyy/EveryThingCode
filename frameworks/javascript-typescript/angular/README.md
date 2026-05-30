@@ -97,6 +97,7 @@ Angular 适合长期维护、团队规模较大、希望官方约定覆盖路由
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：Standalone + Service + Signals 任务工作台。
 
 ## 版本来源

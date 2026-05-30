@@ -113,6 +113,7 @@ Desktop 应用可以通过 Gradle 的 Compose desktop application 插件运行�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：桌面计数器应用，包含 Gradle Kotlin DSL、commonMain 状态对象、commonTest 单元测试和 jvmMain Compose Desktop 入口。
 
 ## 版本来源

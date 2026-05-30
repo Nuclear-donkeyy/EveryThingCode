@@ -120,6 +120,7 @@ Laravel 生态还提供 Forge、Vapor、Octane、Horizon 等工具。Forge 偏�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小任务 API，包含 Composer 依赖声明、Laravel 入口、API 路由、容器解析的 Repository 和可复制运行命令。
 
 ## 版本来源

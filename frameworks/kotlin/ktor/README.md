@@ -115,6 +115,7 @@ JVM 服务端常见部署方式有三种：直接运行 Gradle application 产�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：任务 JSON API，包含 Gradle Kotlin DSL、Ktor Netty 服务端、ContentNegotiation、Routing、内存 store 和 HTTP 测试。
 
 ## 版本来源

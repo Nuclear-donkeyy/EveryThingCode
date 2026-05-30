@@ -157,6 +157,7 @@ Go 使用 `go.mod` 管理模块。`net/http` 属于标准库，所以示例没�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：用标准库实现一个任务 API，包含健康检查、任务列表、创建任务、完成任务和 HTTP 测试。
 
 ## 版本来源

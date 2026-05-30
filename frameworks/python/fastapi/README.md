@@ -143,6 +143,7 @@ uvicorn main:app --reload
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：用内存 books API 演示 Pydantic 模型、依赖注入、OpenAPI、Uvicorn 启动和 pytest 验证。
 
 ## 版本来源

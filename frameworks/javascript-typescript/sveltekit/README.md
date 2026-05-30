@@ -102,6 +102,7 @@ SvelteKit 适合希望组件语法轻、产物小、页面路由和服务端能�
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：任务页面 + JSON API，展示 `+page.ts`、`+page.svelte`、`+server.ts`。
 
 ## 版本来源

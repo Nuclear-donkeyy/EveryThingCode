@@ -114,6 +114,7 @@ Next.js 的学习成本主要来自运行边界：同样是 TypeScript 文件，
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：App Router 最小项目，包含首页 Server Component、`/api/posts` Route Handler、共享数据模块和可本地执行的 smoke test。
 
 ## 版本来源

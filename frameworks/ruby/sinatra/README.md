@@ -135,6 +135,7 @@ Sinatra 应用很适合容器化：镜像中安装依赖，启动命令运行 `b
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小 Sinatra 任务 API，展示 Rack 入口、轻量 DSL、中间件、显式 service/repository 边界。
 
 ## 版本来源

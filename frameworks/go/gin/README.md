@@ -154,6 +154,7 @@ Gin 的核心取舍是：更快写出统一 API，但要主动管理框架边界
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：用 Gin 实现任务 API，展示路由组、中间件、`gin.Context`、JSON 绑定、验证和 HTTP 测试。
 
 ## 版本来源

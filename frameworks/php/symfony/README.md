@@ -119,6 +119,7 @@ Symfony 也适合容器化和平台部署。容器里常见做法是构建阶段
 
 ## 案例索引
 
+- [core-ideas](examples/core-ideas/)：把上一节“解决的问题”和“设计思想”映射到 quickstart 的关键代码片段。
 - [quickstart](examples/quickstart/)：最小任务 API，包含 Symfony Runtime 入口、Kernel、FrameworkBundle、属性路由、自动装配服务和可复制运行命令。
 
 ## 版本来源
