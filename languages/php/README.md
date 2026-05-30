@@ -62,6 +62,7 @@ Throwable、Exception、Error、try/finally。学习时关注错误如何被表�
 ## 案例索引
 
 - [特性与思想辅助教学](features/)：通过解释和可运行例子理解语言设计。
+- [基础语法速览](syntax/)：面向已有编程经验读者的语法快速迁移。
 - [hello](examples/hello/)：最小程序与运行方式，确认 CLI 入口、输出和基本语法。
 - [data-flow](examples/data-flow/)：数据建模、集合处理和函数组合，练习数组、对象和清晰的数据边界。
 - [errors](examples/errors/)：错误建模、恢复和资源边界，观察 `Throwable`、异常转换和清理逻辑。

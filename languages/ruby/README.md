@@ -56,6 +56,7 @@ Ruby 工程的最小结构通常包含 `Gemfile`、`Gemfile.lock`、`lib/`、`te
 ## 案例索引
 
 - [特性与思想辅助教学](features/)：通过解释和可运行例子理解语言设计。
+- [基础语法速览](syntax/)：面向已有编程经验读者的语法快速迁移。
 - [hello](examples/hello/)：最小程序与运行方式
 - [data-flow](examples/data-flow/)：数据建模、集合处理和函数组合
 - [errors](examples/errors/)：错误建模、恢复和资源边界
