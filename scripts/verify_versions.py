@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FIELDS = ["id:", "name:", "version:", "policy:", "official_source:", "checked_at:"]
 EXPECTED_LANGUAGES = 12
-EXPECTED_FRAMEWORKS = 23
+EXPECTED_FRAMEWORKS = 27
 
 
 def block_between(text: str, start: str, end: str | None = None) -> str:

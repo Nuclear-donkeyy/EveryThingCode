@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 LANGUAGES = {
     "java": ["spring-boot"],
-    "javascript-typescript": ["nextjs", "nestjs"],
+    "javascript-typescript": ["react", "vue", "angular", "sveltekit", "nextjs", "nestjs"],
     "python": ["django", "fastapi"],
     "go": ["net-http", "gin"],
     "rust": ["axum", "actix-web"],

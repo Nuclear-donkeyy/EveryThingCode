@@ -37,6 +37,10 @@
 | 框架 | 语言 | 版本基线 | 第一案例 |
 | --- | --- | --- | --- |
 | [Spring Boot](frameworks/java/spring-boot/) | Java | 4.0.x | REST API |
+| [React](frameworks/javascript-typescript/react/) | JavaScript / TypeScript | 19.2.x | 任务看板 SPA |
+| [Vue](frameworks/javascript-typescript/vue/) | JavaScript / TypeScript | 3.5.x | 响应式任务面板 |
+| [Angular](frameworks/javascript-typescript/angular/) | JavaScript / TypeScript | 21.x Active / 20.x LTS | Standalone 工作台 |
+| [SvelteKit](frameworks/javascript-typescript/sveltekit/) | JavaScript / TypeScript | 2.x | 页面与 API |
 | [Next.js](frameworks/javascript-typescript/nextjs/) | JavaScript / TypeScript | 16.x Active LTS | App Router 页面 |
 | [NestJS](frameworks/javascript-typescript/nestjs/) | JavaScript / TypeScript | latest stable | 模块化 API |
 | [Django](frameworks/python/django/) | Python | 5.2 LTS | CRUD 后台 |

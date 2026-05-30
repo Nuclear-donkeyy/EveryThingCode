@@ -14,7 +14,7 @@
 | 语言 | 框架入口 | 本仓库首批覆盖 |
 | --- | --- | --- |
 | Java | [frameworks/java/](java/) | Spring Boot |
-| JavaScript / TypeScript | [frameworks/javascript-typescript/](javascript-typescript/) | Next.js、NestJS |
+| JavaScript / TypeScript | [frameworks/javascript-typescript/](javascript-typescript/) | React、Vue、Angular、SvelteKit、Next.js、NestJS |
 | Python | [frameworks/python/](python/) | Django、FastAPI |
 | Go | [frameworks/go/](go/) | net/http、Gin |
 | Rust | [frameworks/rust/](rust/) | Axum、Actix Web |

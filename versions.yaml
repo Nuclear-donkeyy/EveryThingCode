@@ -116,6 +116,38 @@ frameworks:
     lts: true
     official_source: "https://nextjs.org/docs"
     checked_at: "2026-05-30"
+  - id: react
+    language: javascript-typescript
+    name: "React"
+    version: "19.2.x"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://react.dev/versions"
+    checked_at: "2026-05-30"
+  - id: vue
+    language: javascript-typescript
+    name: "Vue"
+    version: "3.5.x"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://vuejs.org/about/releases"
+    checked_at: "2026-05-30"
+  - id: angular
+    language: javascript-typescript
+    name: "Angular"
+    version: "21.x Active / 20.x LTS"
+    policy: "latest-supported-with-lts-window"
+    lts: true
+    official_source: "https://angular.dev/reference/releases"
+    checked_at: "2026-05-30"
+  - id: sveltekit
+    language: javascript-typescript
+    name: "SvelteKit"
+    version: "2.x"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://svelte.dev/docs/kit/introduction"
+    checked_at: "2026-05-30"
   - id: nestjs
     language: javascript-typescript
     name: "NestJS"
