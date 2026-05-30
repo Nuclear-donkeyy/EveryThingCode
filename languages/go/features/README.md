@@ -44,6 +44,24 @@ Go 不把取消做成隐藏的全局状态，而是把 `context` 作为参数显
 
 Go 采用显式 `error`，是为了让控制流、资源释放和错误上下文都在代码中可见。代价是要写更多 `if err != nil`，但收益是边界清晰。学习者应该观察 `examples/interfaces-composition/` 和 `examples/context-cancellation/`：前者在发送失败时用 `%w` 包装错误，后者保留 `context deadline exceeded`，便于上层用 `errors.Is` 判断原因。
 
+### 错误包装与错误链
+
+它解决的问题是：日志需要可读上下文，程序又需要稳定判断根因。Go 用 `%w`、`errors.Is` 和 `errors.As` 把这两种需求放进同一条错误链，而不是逼开发者在字符串拼接和机器可判断性之间二选一。
+
+Go 选择这种方式，是因为 `error` 本质上仍是普通值。每一层可以显式补充“当前操作是什么”，同时保留底层哨兵错误或结构化错误。学习者应该观察 `examples/errors-wrapping/`：外层错误文本适合排障，`errors.Is` 仍能识别 `ErrUserNotFound`，`errors.As` 仍能取回带字段的 `OperationError`。
+
+### defer 与资源边界
+
+它解决的问题是：文件、连接、锁、事务、timer 和取消函数都需要确定释放，尤其是在错误路径和提前返回时。Go 用 `defer` 把清理动作登记在资源获取附近，让读者不用在每个分支里寻找释放逻辑。
+
+Go 没有把资源释放交给析构函数或异常机制，而是让函数返回边界承担清理时机。这样更显式，也更容易和错误返回配合。学习者应该观察 `examples/defer-resource-cleanup/`：临时文件创建后立刻登记删除和关闭，返回时按后进先出顺序执行。
+
+### 泛型与约束
+
+它解决的问题是：容器、集合算法和小型工具函数常常因为元素类型不同而重复。Go 的泛型用类型参数复用算法，用约束说明算法真正需要的操作，并保持编译期类型检查。
+
+Go 的泛型刻意比很多语言克制：它服务于稳定的重复模式，而不是鼓励复杂类型体操。学习者应该观察 `examples/generics-constraints/`：`Sum` 只接受可相加的数值集合，`GroupBy` 要求 map key 满足 `comparable`，调用方无需类型断言就能拿到具体类型。
+
 ## 深入理解与对比练习
 
 ### 简单不是少写代码，而是少隐藏规则
@@ -66,11 +84,22 @@ Go 的接口常常应该出现在消费者一侧，而不是实现者一侧。�
 
 Go 要求显式检查 `error`，这看起来重复，却迫使你在每个边界决定是否恢复、包装还是向上返回。好的 Go 错误处理会携带上下文，例如 `fmt.Errorf("load config: %w", err)`，而不是只打印字符串。改造例子时，可以给接口实现增加一个失败分支，并用 `errors.Is` 或错误包装说明调用方如何判断可恢复错误。
 
+### defer 把清理责任放回局部上下文
+
+资源泄漏往往不是因为开发者不知道要关闭文件，而是因为错误分支太多，某个提前返回漏掉了清理。`defer` 的学习重点是“资源获取成功后立即登记释放”，而不是把它当作语法糖。学习 `defer-resource-cleanup` 时，观察关闭和删除的输出顺序；再在中间加入一个模拟错误，确认清理逻辑仍然执行。
+
+### 泛型应该从重复中长出来
+
+Go 的泛型适合抽出稳定算法，比如求和、分组、集合转换和类型安全缓存。它不适合把简单业务流程提前抽象成难懂的类型参数网络。学习 `generics-constraints` 时，先看 `Sum` 的约束为什么只列出数值类型，再看 `GroupBy` 的 `K comparable` 为什么来自 map key 的真实需求。好的约束应该解释算法需要什么，而不是展示类型系统技巧。
+
 ## 教学例子索引
 
 - [interfaces-composition](examples/interfaces-composition/)：用小接口、struct 组合和显式 error 表达可替换依赖。
 - [goroutines-channels](examples/goroutines-channels/)：用 worker、job channel 和 result channel 观察并发协作。
 - [context-cancellation](examples/context-cancellation/)：用 `context.WithTimeout` 控制后台任务生命周期。
+- [errors-wrapping](examples/errors-wrapping/)：用 `%w`、`errors.Is` 和 `errors.As` 同时保留错误上下文和可判断根因。
+- [defer-resource-cleanup](examples/defer-resource-cleanup/)：用 `defer` 管理文件关闭和临时文件删除，观察清理顺序。
+- [generics-constraints](examples/generics-constraints/)：用类型参数和约束复用集合算法，同时保持具体类型。
 
 ## 学习检查
 
@@ -79,3 +108,5 @@ Go 要求显式检查 `error`，这看起来重复，却迫使你在每个边界
 - 你能解释 `context` 取消信号如何从调用方传到工作函数吗？
 - 你能在错误输出中保留底层原因，同时给上层补充业务上下文吗？
 - 你能把一个新通知实现接入 `interfaces-composition`，而不修改 `Service` 的核心逻辑吗？
+- 你能解释 `defer` 为什么按后进先出执行，以及这对资源依赖顺序有什么影响吗？
+- 你能判断一个重复函数是否适合改成泛型，并写出不过宽也不过窄的约束吗？

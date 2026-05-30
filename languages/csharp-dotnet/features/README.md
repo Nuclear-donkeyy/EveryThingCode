@@ -18,9 +18,16 @@ C# / .NET 是“托管运行时上的多范式工程语言”。它保留了面�
 | --- | --- | --- | --- |
 | 面向对象与泛型 | 业务对象需要封装状态和行为，集合、仓储、管道又需要复用同一套算法。 | C# 使用名义类型、接口、多态和运行时保留类型信息的泛型，让 API 既能抽象又能保留强类型检查。泛型约束可以表达“这个算法需要对象至少具备什么能力”。 | [records-patterns](examples/records-patterns/) |
 | record 与不可变数据 | 普通 class 容易被多处修改，值对象的相等性、复制和调试输出也容易重复书写。 | `record` 默认强调基于值的相等性、主构造参数和 `with` 复制，适合表达订单、配置、事件、查询结果这类“事实数据”。它不是深不可变，集合属性仍要谨慎设计。 | [records-patterns](examples/records-patterns/) |
+| 模式匹配与 switch 表达式 | 业务分支常常依赖对象形状、属性范围和少量守卫条件，散落的 `if` 会让规则难以审查。 | C# 把类型模式、属性模式、关系模式和 `when` 守卫组合进表达式，让“如何分类一个对象”集中呈现，并且能直接返回结果。 | [records-patterns](examples/records-patterns/) |
 | LINQ 的声明式数据流 | 集合处理经常包含过滤、映射、排序、分组和聚合，手写循环容易把“做什么”和“怎么迭代”混在一起。 | C# 把 lambda、扩展方法和 `IEnumerable<T>` 组合成统一查询模型，让数据转换可以从左到右阅读。代价是要理解延迟执行和多次枚举。 | [linq-data-flow](examples/linq-data-flow/) |
 | async/await 与 Task | 服务端、桌面和 CLI 常要等待文件、网络、数据库或计时器，阻塞线程会浪费吞吐。 | .NET 用 `Task` 表示未来完成的工作，`await` 把等待点编译成状态机，异常和结果仍能用接近同步代码的方式处理。它并不自动创建线程，CPU 密集任务仍要另行建模。 | [async-tasks](examples/async-tasks/) |
-| nullable reference types | 引用类型默认可能为 null，空引用错误常常离真正的来源很远。 | C# 用 `string` / `string?` 这类注解把可空性变成编译期契约。它依赖项目启用 `<Nullable>enable</Nullable>` 和团队遵守警告，不能替代运行时校验。 | [async-tasks](examples/async-tasks/) |
+| nullable reference types | 引用类型默认可能为 null，空引用错误常常离真正的来源很远。 | C# 用 `string` / `string?` 这类注解把可空性变成编译期契约。它依赖项目启用 `<Nullable>enable</Nullable>` 和团队遵守警告，不能替代运行时校验。 | [nullable-reference-types](examples/nullable-reference-types/) |
+| 接口与依赖注入 | 业务逻辑常要使用时间、通知、数据库或网络等外部能力，直接创建具体对象会让测试和替换变困难。 | C# 用接口表达能力契约，用构造函数注入让对象图在边界处组装。框架容器只是自动化这件事，核心仍是依赖抽象而不是依赖细节。 | [interfaces-dependency-injection](examples/interfaces-dependency-injection/) |
+| using 与 IDisposable | GC 能管理托管内存，但文件句柄、连接、锁和缓冲区需要确定性释放。 | .NET 用 `IDisposable` 表示同步清理契约，C# 的 `using` 把资源生命周期绑定到词法作用域，异常路径也会执行释放逻辑。 | [using-disposable](examples/using-disposable/) |
+
+这些特性不是彼此孤立的语法点。一个真实的 C# 服务可能用 record 表达请求和响应，用 nullable reference types 标注外部输入，用接口注入时间、日志和仓储，用 LINQ 处理内存数据或查询结果，用 async/await 等待 I/O，再用 using 管住文件、连接或作用域服务。学习地图的目的不是让你按表格背诵，而是把“问题、语言设计、运行现象”连成一条线。
+
+观察例子时，可以刻意问三个问题：第一，类型签名有没有把业务边界说清楚；第二，控制流有没有把正常路径、错误路径和资源路径分开；第三，如果删掉这个特性，代码会退化成什么形状。能回答这三个问题，才算真正理解 C# 的工程化取舍。
 
 ## 深入理解与对比练习
 
@@ -44,13 +51,24 @@ LINQ 的价值是把筛选、映射、分组、排序和聚合表达成数据流
 
 可空引用类型不会改变 CLR 的根本模型，但它让“这里可能为空”进入编译期分析。学习时要关注 API 边界：外部输入、数据库字段、配置读取通常需要显式处理 null，而内部领域模型应尽量保持非空不变量。可以在例子中新增一个可能为空的名称字段，观察编译器警告如何推动你在入口处校验，而不是在深处崩溃。
 
+### 接口和依赖注入把变化推到边界
+
+`interfaces-dependency-injection` 故意不使用框架容器，因为依赖注入首先是一种对象组合方式。业务类通过构造函数接收 `IClock` 和 `INotifier`，因此它可以稳定地测试时间逻辑，也可以把通知实现从控制台换成邮件、短信或测试替身。对比练习是把 `new ConsoleNotifier()` 移回业务类内部，再思考测试为什么变难。
+
+### using 是资源生命周期的可见边界
+
+`using-disposable` 展示的是 .NET 中非常朴素但重要的边界意识：对象离开作用域时，外部资源应当被及时释放。可以把 `using` 改成手写 `try/finally`，观察两者等价但后者更啰嗦；也可以在写文件中途抛异常，确认释放逻辑仍会发生。这个思想会延伸到数据库连接、HTTP 响应流、锁和异步资源。
+
 ## 教学例子索引
 
 - [records-patterns](examples/records-patterns/)：用接口、泛型仓储、record、`with` 和模式匹配表达一个小型学习计划模型。
 - [linq-data-flow](examples/linq-data-flow/)：把报名事件转换成课程报表，观察 LINQ 的过滤、分组、排序、投影和延迟执行。
 - [async-tasks](examples/async-tasks/)：并发加载三个课程卡片，观察 `Task.WhenAll`、`await`、nullable reference types 和取消令牌的协作方式。
+- [nullable-reference-types](examples/nullable-reference-types/)：把可能为空的外部输入转换成内部非空模型，观察编译期可空契约如何推动边界校验。
+- [interfaces-dependency-injection](examples/interfaces-dependency-injection/)：用接口抽象时间和通知能力，用构造函数注入展示依赖倒置和可测试设计。
+- [using-disposable](examples/using-disposable/)：用 `using` 和 `IDisposable` 管理文件写入器，观察资源打开、释放和业务数据保留之间的关系。
 
-这些例子故意不引入 ASP.NET Core、Entity Framework Core 或第三方函数式库。真实项目中，面向对象和泛型会出现在服务、仓储、控制器、领域模型和测试替身里；LINQ 会连接内存集合、数据库查询和 JSON 处理；async/await 会扩展到 HTTP、数据库、消息队列和后台任务。先用标准库看清语言思想，再进入框架会更稳。
+这些例子故意不引入 ASP.NET Core、Entity Framework Core 或第三方函数式库。真实项目中，面向对象和泛型会出现在服务、仓储、控制器、领域模型和测试替身里；LINQ 会连接内存集合、数据库查询和 JSON 处理；async/await 会扩展到 HTTP、数据库、消息队列和后台任务；可空注解会贯穿 DTO、配置和领域模型；`using` 会管理文件、连接、响应流和作用域服务。先用标准库看清语言思想，再进入框架会更稳。
 
 ## 学习检查
 
@@ -59,3 +77,5 @@ LINQ 的价值是把筛选、映射、分组、排序和聚合表达成数据流
 - 能否解释 `async` 方法返回 `Task<T>` 时，结果和异常分别在什么时候被观察到。
 - 能否在打开 nullable reference types 的项目里，让可能为空的值通过显式判断、默认值或早返回处理。
 - 能否为一个泛型方法写出合适的约束，而不是在方法体里依赖强制转换。
+- 能否为一个业务类找出真正需要抽象的外部依赖，并用接口替换硬编码创建。
+- 能否说明哪些对象需要 `IDisposable`，以及 `using` 为什么释放资源但不等于删除业务数据。

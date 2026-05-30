@@ -13,9 +13,17 @@ REQUIRED_FEATURE_HEADINGS = [
     "## 教学例子索引",
     "## 学习检查",
 ]
-REQUIRED_EXAMPLE_HEADINGS = ["## 目标", "## 运行", "## 观察点"]
+REQUIRED_EXAMPLE_HEADINGS = [
+    "## 目标",
+    "## 特性说明",
+    "## 设计取舍",
+    "## 运行",
+    "## 观察点",
+    "## 延伸练习",
+]
 MIN_FEATURE_CHARS = 2200
-MIN_EXAMPLES = 3
+MIN_EXAMPLES = 6
+MIN_EXAMPLE_CHARS = 700
 
 
 def has_bash_command(text: str) -> bool:
@@ -71,6 +79,9 @@ def main() -> int:
             for heading in REQUIRED_EXAMPLE_HEADINGS:
                 if heading not in body:
                     failures.append(f"{readme.relative_to(ROOT)} missing heading: {heading}")
+            nonspace_chars = sum(1 for char in body if not char.isspace())
+            if nonspace_chars < MIN_EXAMPLE_CHARS:
+                failures.append(f"{readme.relative_to(ROOT)} too short: {nonspace_chars} non-space chars")
             if not has_bash_command(body):
                 failures.append(f"{readme.relative_to(ROOT)} missing runnable bash command")
             source_files = [path for path in readme.parent.iterdir() if path.is_file() and path.name != "README.md"]

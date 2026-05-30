@@ -20,17 +20,23 @@ JavaScript 的核心思想是“动态对象 + 函数一等公民 + 事件驱动
 
 这门语言选择这种方式，是因为浏览器和 Node 都需要保持响应性，同时又希望普通业务代码不必直接管理线程锁。学习者应观察 `examples/event-loop-promises/`：它展示同步日志、Promise 微任务、`queueMicrotask`、`setTimeout` 和 `await` 的相对顺序。
 
-### 原型/对象模型
+### 原型委托与对象模型
 
 它解决的问题是：对象需要共享行为，同时又要保持运行时灵活。JavaScript 没有把“类”作为唯一对象模型；对象可以通过原型链查找方法，`class` 只是更规整的语法外观。这样做的代价是 `this`、方法提取、属性遮蔽和原型修改都需要谨慎理解。
 
-这门语言保留原型模型，是为了让对象字面量、函数、构造器和类都能落在同一套动态对象机制上。学习者可以在本页先理解这个模型，再回到根目录的 `examples/data-flow/` 对比对象字面量如何承载数据。这里的三个新增例子不专门写原型代码，但 `typed-data-shapes` 会展示对象“形状”在运行时仍要被检查。
+这门语言保留原型模型，是为了让对象字面量、函数、构造器和类都能落在同一套动态对象机制上。学习者应观察 `examples/prototype-delegation/`：它用 `Object.create` 展示实例状态、共享方法、属性遮蔽和方法提取时 `this` 丢失的风险。
 
 ### 模块与闭包
 
 它解决的问题是：代码需要拆分文件，同时还要保留局部状态，避免所有变量挤到全局作用域。ES Module 给每个文件独立模块作用域，闭包让内部函数记住创建时的词法环境。两者组合后，可以写出“暴露少量函数，隐藏内部状态”的小模块。
 
 JavaScript 使用词法作用域和一等函数，是因为函数既是行为单元，也是组合单元。学习者应观察 `examples/modules-closures/`：它在一个文件里模拟模块工厂，展示两个计数器如何共享同一套函数逻辑，却各自持有独立状态。
+
+### 异步迭代器与流式数据
+
+它解决的问题是：数据可能不是一次性到达，而是一段一段从文件、网络、数据库游标或消息队列里出现。异步迭代器把“等待下一项”变成标准协议，`for await...of` 让消费者用顺序代码处理流式输入。Node 的 `Readable.from` 可以把异步可迭代对象接到标准流生态中。
+
+这门语言选择协议化的迭代方式，是为了让不同数据源共享同一种消费语法，同时保留背压、提前退出和错误传播的空间。学习者应观察 `examples/async-iterators-streams/`：它展示 async generator 逐条产生事件，消费者边到达边统计，而不是先把所有数据装进数组。
 
 ### TypeScript 的结构化类型思想
 
@@ -44,6 +50,18 @@ JavaScript 使用词法作用域和一等函数，是因为函数既是行为单
 
 JavaScript / TypeScript 这样分工，是为了不改变 JS 运行时、保持生态兼容，同时给开发期提供足够强的反馈。学习者应观察 `examples/typed-data-shapes/`：它把原始 JSON 先当成未知值处理，再显式验证字段，最后才进入业务计算。
 
+### Promise 错误边界
+
+它解决的问题是：异步任务失败时，错误必须能被表达、传播、聚合和恢复。`throw` 在 `async` 函数中会变成 rejected Promise，`await` 会在当前边界重新抛出它；并发任务则需要选择 `Promise.all`、`Promise.allSettled` 或自定义收敛策略。
+
+这门语言把异步结果和异步失败都放进 Promise，是为了让成功、失败和组合使用同一套抽象。学习者应观察 `examples/error-handling-promises/`：它同时启动多个配置加载任务，用 `Promise.allSettled` 保留成功结果和失败诊断，再在启动边界做最终决策。
+
+### 一等函数与组合式数据处理
+
+它解决的问题是：业务逻辑经常需要把数据转换、过滤、聚合和延迟执行组合起来。JavaScript 把函数当作普通值，可以传递、返回、保存到对象里；这让数组方法、回调、闭包、Promise 后续步骤和中间件模式都建立在同一思想上。
+
+这门语言选择函数一等公民，是为了让小行为可以被组合，而不是只能通过继承层级表达变化。学习者可以先观察 `examples/modules-closures/` 中函数如何携带状态，再观察 `examples/event-loop-promises/` 中函数如何作为异步后续步骤进入微任务队列。
+
 ## 深入理解与对比练习
 
 ### 事件循环是“安排工作”的模型
@@ -56,7 +74,11 @@ JavaScript 的异步不是简单的“多线程”。事件循环把同步调用
 
 ### 原型模型强调委托
 
-JavaScript 对象不是从类复制出方法，而是通过原型链查找行为。`class` 语法让它看起来像传统类，但运行时仍然是原型委托。学习对象模型时，建议用 `Object.getPrototypeOf()` 观察方法在哪里，再思考为什么给实例动态加属性不会影响其他实例，而改原型方法会影响共享行为。这个模型解释了很多“为什么 this 变了”“为什么方法能被覆盖”的问题。
+JavaScript 对象不是从类复制出方法，而是通过原型链查找行为。`class` 语法让它看起来像传统类，但运行时仍然是原型委托。学习 `prototype-delegation` 时，建议用 `Object.getPrototypeOf()` 观察方法在哪里，再思考为什么给实例动态加属性不会影响其他实例，而改原型方法会影响共享行为。这个模型解释了很多“为什么 this 变了”“为什么方法能被覆盖”的问题。
+
+### 流式处理强调渐进消费
+
+异步迭代器适合处理“现在还没有全部准备好”的数据。学习 `async-iterators-streams` 时，先观察源数据和消费者日志交替出现；再把处理逻辑改成先收集数组、最后统一统计，比较首条结果延迟和内存模型。这个对比能帮助你判断什么时候应该用数组，什么时候应该保留流式边界。
 
 ### TypeScript 保护的是开发期边界
 
@@ -66,11 +88,18 @@ TypeScript 的类型在编译后会消失，所以它不能替代运行时校验
 
 TypeScript 的结构化类型意味着“形状兼容即可赋值”，这非常适合前端数据组合和渐进迁移，但也可能让语义不同、字段相同的对象被误用。练习时可以设计 `UserId` 和 `ProductId` 都是字符串的场景，思考为什么需要 branded type 或封装对象。这个对比能帮助你理解：类型系统不只是检查字段，还要帮助表达业务含义。
 
+### Promise 错误要在边界收敛
+
+异步错误不会自动变成调用栈上的同步异常；它们必须被 `await`、返回或捕获。学习 `error-handling-promises` 时，把 `Promise.allSettled` 改成 `Promise.all`，比较 fail fast 和完整诊断的区别。再删除最外层 `catch`，观察未处理 rejection 如何暴露。这个练习能帮助你为真实服务选择“部分成功继续”还是“任一失败停止”的策略。
+
 ## 教学例子索引
 
 - [event-loop-promises](examples/event-loop-promises/)：观察同步代码、微任务、计时器和 `await` 的执行顺序，理解 Promise 不是线程。
 - [modules-closures](examples/modules-closures/)：用闭包保存私有状态，理解模块边界为什么能减少全局变量污染。
 - [typed-data-shapes](examples/typed-data-shapes/)：用运行时校验保护对象形状，对应 TypeScript 的结构化类型和输入边界思想。
+- [prototype-delegation](examples/prototype-delegation/)：用 `Object.create` 观察原型委托、属性遮蔽、共享方法和 `this` 绑定风险。
+- [async-iterators-streams](examples/async-iterators-streams/)：用 async generator、Node readable stream 和 `for await...of` 理解流式数据消费。
+- [error-handling-promises](examples/error-handling-promises/)：用 `Promise.allSettled`、自定义错误和 `cause` 练习异步错误聚合。
 
 ## 学习检查
 
@@ -79,3 +108,5 @@ TypeScript 的结构化类型意味着“形状兼容即可赋值”，这非常
 - 你能否区分对象的运行时原型链和 TypeScript 的静态结构化类型？
 - 你能否指出哪些数据已经在程序内部可信，哪些仍来自运行时边界需要校验？
 - 你能否把一个例子的输入改坏，并说明错误是在静态阶段、运行阶段，还是人工观察阶段暴露的？
+- 你能否说明为什么 `for await...of` 适合渐进到达的数据，而普通数组适合已经完整在内存中的数据？
+- 你能否为并发异步任务选择 `Promise.all` 或 `Promise.allSettled`，并解释这个选择对错误诊断的影响？

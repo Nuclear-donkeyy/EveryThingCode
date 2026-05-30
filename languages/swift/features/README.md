@@ -4,13 +4,13 @@
 
 这个模块把 Swift 的核心思想和可运行例子放在一起。建议先读完“思想总览”和“核心特性地图”，再进入 `examples/` 下的目录运行代码。每个例子都可以在自己的目录里执行 `swift main.swift`，不需要额外依赖或 Swift Package。
 
-学习时不要只看输出，要观察 Swift 把哪些风险提前放进类型系统：缺失值必须写成 `Optional`，失败路径必须通过 `throws` 或 `Result` 暴露，共享可变状态应被 actor 隔离，抽象能力通常由协议和泛型表达。Swift 的很多语法看起来精致，但真正重要的是它希望代码读者能从类型、参数标签和控制流中看见设计意图。
+学习时不要只看输出，要观察 Swift 把哪些风险提前放进类型系统：缺失值必须写成 `Optional`，失败路径必须通过 `throws` 或 `Result` 暴露，有限状态适合用枚举关联值建模，共享可变状态应被 actor 隔离，抽象能力通常由协议和泛型表达。Swift 的很多语法看起来精致，但真正重要的是它希望代码读者能从类型、参数标签和控制流中看见设计意图。
 
 ## 思想总览
 
 Swift 的设计偏向“安全默认值、值优先、清晰边界”。它鼓励先用 `struct`、`enum` 和不可变 `let` 建模，再在确实需要身份、继承或共享生命周期时使用 `class`。这种倾向解决的是大型客户端和库代码里的可维护性问题：当数据在 UI、网络、缓存和业务层之间传递时，值语义能减少“谁在背后改了它”的疑问。
 
-Swift 也把常见失败做成显式结构。`Optional` 表示值可能不存在，`throws` 表示函数可能失败，`async` 表示调用可能暂停，actor 表示状态只能通过隔离边界访问。语言不是把复杂度藏起来，而是让复杂度在函数签名和类型约束中可见。代价是初学时会觉得 `guard let`、`try`、`await` 和协议约束偏严格；收益是项目变大后，编译器能帮团队守住很多边界。
+Swift 也把常见失败和状态变化做成显式结构。`Optional` 表示值可能不存在，`throws` 表示函数可能失败，`Result` 表示成功或失败可以作为普通值传递，枚举关联值表示每个状态都有自己的数据，`async` 表示调用可能暂停，actor 表示状态只能通过隔离边界访问。语言不是把复杂度藏起来，而是让复杂度在函数签名和类型约束中可见。代价是初学时会觉得 `guard let`、`try`、`await`、`switch` 穷尽检查和协议约束偏严格；收益是项目变大后，编译器能帮团队守住很多边界。
 
 ## 核心特性地图
 
@@ -38,11 +38,23 @@ Swift 这样设计，是为了让缺失成为类型的一部分。你必须用 `
 
 Swift 选择这种方式，是因为失败路径应该在调用点可见。一个函数标了 `throws`，调用方就必须 `try`，并选择捕获、继续抛出或转换成更高层的状态。学习者应该观察 `examples/optional-errors/`：`loadPort` 用 `guard` 把 Optional 失败转换成具体错误，`catch` 再把错误变成人能读懂的输出。
 
+### 枚举关联值
+
+它解决的问题是：真实业务状态通常是有限且互斥的，但每种状态需要的数据不同。如果用字符串状态码、多个布尔值和一堆可选字段表达，代码很容易产生非法组合，例如“订单既支付成功又支付失败”，或“失败了却没有失败原因”。Swift 的 `enum` 可以让每个 case 携带自己的关联值，把状态名称和状态数据绑定在一起。
+
+Swift 用这种方式解决，是因为它希望类型本身表达领域约束。`switch` 的穷尽检查会在新增状态时提醒调用方更新处理逻辑，模式匹配又能在分支内直接拿到对应数据。学习者应该观察 `examples/enums-associated-values/`：结账流程的每个状态都有不同字段，输出时不需要猜哪些 Optional 字段此刻有效。
+
+### Result 错误建模
+
+它解决的问题是：有些场景里成功和失败不只是控制流，还需要作为值被保存、传递、排队或批量统计。Swift 的 `Result<Success, Failure>` 把成功值和失败值建成一个二选一的枚举，调用方必须用 `switch` 或组合方法面对两条路径。
+
+Swift 同时保留 `throws` 和 `Result`，是因为错误边界不同。顺序流程里 `throws` 往往更清楚；表单验证、回调结果、批处理和状态机里，`Result` 更容易被收集和传递。学习者应该观察 `examples/result-error-modeling/`：注册校验不会返回松散的 `(Account?, String?)`，而是明确得到 `.success(Account)` 或 `.failure(SignupError)`。
+
 ### async/await 与 actor 思想
 
 它解决的问题是：异步程序以前常被回调、共享状态和线程切换拆散，读者难以看出任务生命周期和状态归属。Swift 的 `async/await` 让异步调用按顺序阅读，结构化并发让子任务有清晰生命周期，actor 则把可变状态隔离到受保护的执行上下文里。
 
-Swift 采用这种模型，是因为客户端 UI、网络请求、文件 IO 和服务端请求处理都需要并发，但并发错误往往比普通逻辑错误更隐蔽。`await` 提醒读者这里可能暂停，actor 隔离提醒读者跨边界访问状态需要异步协调。这个模块暂不把 actor 放进最小脚本例子里，是为了让前三个例子保持短小；学习者应先理解 `examples/value-semantics/` 中“避免共享可变状态”的动机，再把它迁移到 actor 的“必须共享时就隔离共享状态”。
+Swift 采用这种模型，是因为客户端 UI、网络请求、文件 IO 和服务端请求处理都需要并发，但并发错误往往比普通逻辑错误更隐蔽。`await` 提醒读者这里可能暂停，actor 隔离提醒读者跨边界访问状态需要异步协调。学习者应该观察 `examples/async-await-tasks/`：两个 `async let` 子任务并发启动，并在 `await` 处汇合；再回到 `examples/value-semantics/` 理解“能不共享就不共享，必须共享就隔离共享状态”的动机。
 
 ## 深入理解与对比练习
 
@@ -64,7 +76,15 @@ Swift 不允许普通类型偷偷为 nil，缺失必须写成 Optional。学习 
 
 ### throws 和 Result 分别适合不同边界
 
-`throws` 适合顺序流程中把失败交给调用方处理，`Result` 适合把成功/失败作为值存储、传递或组合。学习错误例子时，可以把一个 throwing 函数改成返回 `Result`，观察调用方是 `do/catch` 更清楚，还是 `switch` 更清楚。这个选择在网络层、表单校验和异步回调里非常常见。
+`throws` 适合顺序流程中把失败交给调用方处理，`Result` 适合把成功/失败作为值存储、传递或组合。学习 `optional-errors` 时，可以把一个 throwing 函数改成返回 `Result`；学习 `result-error-modeling` 时，也可以反向改成 `throws`。观察调用方是 `do/catch` 更清楚，还是 `switch` 更清楚。这个选择在网络层、表单校验和异步回调里非常常见。
+
+### 枚举关联值让非法状态变少
+
+Swift 的枚举关联值适合表达“有限状态，每个状态自带数据”。学习 `enums-associated-values` 时，可以故意用结构体加多个 Optional 字段重写结账状态，然后列出可能出现的矛盾组合。这个对比能解释为什么 Swift API 和应用状态常把状态写成 enum，而不是字符串常量。
+
+### async/await 把暂停点写出来
+
+学习 `async-await-tasks` 时，重点观察完成顺序和汇合点。`async let` 让两个任务并发启动，但结果必须在当前作用域内等待；`Task` 则把异步工作变成可以持有的值。再把代码改成顺序 `await`，你会看到可读性差不多，但执行行为已经变化。这能帮助你区分“代码书写顺序”和“任务实际并发”。
 
 ### actor 思想是隔离可变状态
 
@@ -75,6 +95,9 @@ Swift 不允许普通类型偷偷为 nil，缺失必须写成 Optional。学习 
 - [value-semantics](examples/value-semantics/)：用结构体、数组和类对比观察值语义与引用身份。
 - [protocol-generics](examples/protocol-generics/)：用协议约束和泛型函数复用评分逻辑。
 - [optional-errors](examples/optional-errors/)：把 Optional 解包、`guard`、`throws` 和 `catch` 串成一条输入校验路径。
+- [enums-associated-values](examples/enums-associated-values/)：用关联值枚举表达互斥业务状态和状态专属数据。
+- [result-error-modeling](examples/result-error-modeling/)：用 `Result` 把表单校验的成功和失败作为值建模。
+- [async-await-tasks](examples/async-await-tasks/)：用 `async`、`await`、`async let` 和 `Task` 观察结构化并发的基本边界。
 
 ## 学习检查
 
@@ -83,4 +106,6 @@ Swift 不允许普通类型偷偷为 nil，缺失必须写成 Optional。学习 
 - 你能把一个新类型接入 `protocol-generics` 的 `topItem`，而不修改 `topItem` 本身吗？
 - 你能说清楚 `String?`、空字符串和无效数字在业务含义上有什么不同吗？
 - 你能在 `optional-errors` 中新增一个校验规则，并让错误消息保留具体原因吗？
-- 你能用一句话说明 `await` 和 actor 隔离分别提醒读者注意什么边界吗？
+- 你能说明为什么 `CheckoutState` 用枚举比用多个布尔值更不容易产生非法状态吗？
+- 你能判断同一个校验流程应该返回 `Result`，还是写成 `throws` 吗？
+- 你能用一句话说明 `await`、`async let` 和 actor 隔离分别提醒读者注意什么边界吗？

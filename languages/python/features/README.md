@@ -18,7 +18,7 @@ Python 的核心取舍是把常见任务写得直接、可读，并把复杂度�
 
 - 解决什么问题：真实项目里，很多函数只关心对象“能做什么”，不关心它属于哪个继承层级。例如日志对象只要有 `record()` 方法，数据行只要能按键读取，调用方就不必被具体类绑死。
 - Python 为什么这样解决：Python 的动态绑定让代码天然面向行为协议。相比先设计庞大的接口树，Python 更鼓励用小函数、小对象和清晰命名表达意图，必要时再用类型标注或 `Protocol` 固化边界。
-- 观察哪个例子：看 [context-manager-resource](examples/context-manager-resource/) 中 `process_orders()` 如何只依赖日志对象的行为，而不是要求某个复杂基类。
+- 观察哪个例子：看 [protocol-duck-typing](examples/protocol-duck-typing/) 如何让终端输出和内存输出满足同一个 `EventSink` 协议；也可以对照 [context-manager-resource](examples/context-manager-resource/) 中 `process_orders()` 对日志对象行为的依赖。
 
 ### dataclass 与模式匹配
 
@@ -37,6 +37,18 @@ Python 的核心取舍是把常见任务写得直接、可读，并把复杂度�
 - 解决什么问题：网络请求、传感器读取、队列消费等 I/O 操作大量时间都在等待。如果逐个等待，程序简单但慢；如果随手创建任务，失败、取消和结果收集又容易失控。
 - Python 为什么这样解决：`asyncio` 用协作式调度表达“等待时让出控制权”。`TaskGroup` 进一步提供结构化并发：一组任务在同一个块里创建、等待和收束，任务生命周期不飘在外面。
 - 观察哪个例子：看 [asyncio-task-group](examples/asyncio-task-group/) 如何并发读取多个探针，并在旧版本解释器上对照 `gather()` 的兼容写法。
+
+### 迭代器与生成器
+
+- 解决什么问题：日志、文件、数据库游标和网络流可能很大，或者没有必要一次性全部加载。把每一步都做成列表，会浪费内存，也会让后续不需要的数据被提前处理。
+- Python 为什么这样解决：Python 把“可被 `for` 消费”抽象成统一的迭代协议，生成器函数用 `yield` 以很低的语法成本实现惰性数据流。函数可以接收 `Iterable`，返回 `Iterator`，从而把解析、过滤、截断组合成流水线。
+- 观察哪个例子：看 [generators-iterators](examples/generators-iterators/) 中解析日志的输出顺序，确认流水线创建时不处理数据，消费时才逐条推进，并且可以提前停止。
+
+### 函数对象、闭包与装饰器
+
+- 解决什么问题：审计、计时、缓存、权限、事务和重试这类横切逻辑常常围绕函数调用出现。如果每个业务函数都手写一遍，代码会重复且不一致。
+- Python 为什么这样解决：Python 函数是一等对象，可以被传入、返回并保存在闭包里。装饰器语法把“用包装函数增强原函数”的动作放在函数定义处，同时保留业务主体的直线表达。
+- 观察哪个例子：看 [decorators-functions](examples/decorators-functions/) 如何用一个装饰器给两个业务函数加入审计和耗时记录，并用 `functools.wraps` 保留原函数元数据。
 
 ### 异常和 EAFP
 
@@ -66,11 +78,22 @@ Python 的灵活性很容易被误解成“什么对象都可以传”。真正�
 
 EAFP 不是裸 `except`。好的 Python 代码会尝试执行最直接的操作，然后捕获明确、可恢复的异常，并保留足够上下文。比如解析订单时捕获 `KeyError` 或 `ValueError`，而不是吞掉所有 `Exception`。修改例子时，可以给输入加入缺字段、非法数字和空列表三种错误，分别写出不同处理分支，体会“正常路径干净”和“失败路径具体”可以同时成立。
 
+### 生成器把数据流和容器选择分开
+
+列表适合小而稳定的数据，但很多工程输入更像一条流。生成器让解析、过滤、转换和截断拆成独立函数，每个函数只承诺自己能被迭代消费。学习 `generators-iterators` 时，可以把输入从内存列表换成文件对象，其他处理步骤不需要改变。这个对比能帮助你看到 Python 的 `for` 循环并不只属于列表，而是围绕迭代协议工作。
+
+### 装饰器适合调用边界，不适合隐藏业务
+
+装饰器最适合那些发生在函数调用边界、并且可以跨函数复用的逻辑，例如记录耗时、缓存结果、做权限检查或包装事务。它不适合把核心业务判断藏到看不见的包装层里。学习 `decorators-functions` 时，可以故意删除 `functools.wraps`，观察函数名和调试信息的变化；再思考为什么框架里的路由、任务和测试装饰器都很重视元数据保留。
+
 ## 教学例子索引
 
 - [dataclass-pattern-matching](examples/dataclass-pattern-matching/)：用 `dataclass` 建模事件，并用模式匹配表达不同事件形状的处理方式。
 - [context-manager-resource](examples/context-manager-resource/)：实现一个日志上下文管理器，观察 `with` 如何定义资源生命周期。
 - [asyncio-task-group](examples/asyncio-task-group/)：并发读取多个模拟探针，理解 `asyncio` 与结构化任务收束。
+- [protocol-duck-typing](examples/protocol-duck-typing/)：用 `Protocol` 描述“能写事件”的小接口，理解 duck typing 如何降低业务函数和输出目标的耦合。
+- [generators-iterators](examples/generators-iterators/)：用 `yield` 串起解析、过滤和截断流水线，观察惰性执行与提前停止。
+- [decorators-functions](examples/decorators-functions/)：用装饰器为函数增加审计和计时，理解一等函数、闭包与 `functools.wraps`。
 
 ## 学习检查
 
@@ -79,3 +102,5 @@ EAFP 不是裸 `except`。好的 Python 代码会尝试执行最直接的操作�
 - 你能否解释 `with` 块结束时一定会发生什么，以及为什么这比手动 `close()` 更稳？
 - 你能否区分“并发等待 I/O”和“并行加速 CPU 计算”？
 - 你能否写出只捕获具体异常的 EAFP 代码，而不是用裸 `except` 吞掉所有错误？
+- 你能否解释生成器为什么能在只需要前几个结果时避免处理完整输入？
+- 你能否判断某段横切逻辑适合写成装饰器，还是应该留在业务函数体内？

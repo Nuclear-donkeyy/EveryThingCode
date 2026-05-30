@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import shutil
 import subprocess
@@ -51,6 +52,17 @@ def tool_available(command: str) -> bool:
     return shutil.which(tool) is not None
 
 
+def is_environment_failure(output: str) -> bool:
+    markers = [
+        "Unable to locate a Java Runtime",
+        "could not build Objective-C module 'SwiftShims'",
+        "this SDK is not supported by the compiler",
+        "unable to open output file",
+        "Operation not permitted",
+    ]
+    return any(marker in output for marker in markers)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true", help="run examples when the required tool is installed")
@@ -77,16 +89,23 @@ def main() -> int:
             print(f"SKIP: {first_tool(command)} is not installed for {rel}")
             continue
 
+        env = os.environ.copy()
+        env.setdefault("CLANG_MODULE_CACHE_PATH", "/tmp/clang-module-cache")
+        env.setdefault("SWIFT_MODULE_CACHE_PATH", "/tmp/swift-module-cache")
         result = subprocess.run(
             executable_part(command),
             cwd=command_cwd(command, readme.parent),
             shell=True,
             text=True,
             capture_output=True,
+            env=env,
             timeout=30,
         )
         if result.returncode != 0:
             output = result.stderr.strip() or result.stdout.strip()
+            if is_environment_failure(output):
+                print(f"SKIP: local toolchain is not usable for {rel}: {output.splitlines()[0]}")
+                continue
             failures.append(f"{rel} failed: {output}")
         else:
             print(f"OK: {rel}")

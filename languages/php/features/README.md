@@ -23,8 +23,10 @@ Composer 与 autoload 的核心思想是“类名映射到文件，依赖由项�
 | 请求生命周期 | 避免一次请求的临时状态污染下一次请求，并让 Web 部署保持简单。 | PHP 长期围绕 Web 请求设计，入口文件在每次请求中组装输入、业务和响应，请求结束后释放局部状态；常驻进程是更高级的工程选择。 | `throwable-recovery` 用命令行模拟请求处理、响应构造和统一错误出口。 |
 | 数组与对象建模 | 既要快速处理外部输入，又要让核心业务结构可读、可验证。 | PHP 数组同时覆盖列表和映射，适合边界数据；现代 PHP 用类、只读属性和类型把稳定概念建成对象。 | `collections-arrays` 展示从关联数组过滤、分组，再转换成对象集合。 |
 | strict_types 与现代类型系统 | 减少隐式类型转换、空值和错误参数在业务深处才爆炸。 | PHP 为兼容历史代码，把严格标量检查设计成按文件声明；新代码可用参数类型、返回类型、属性类型和异常逐步收紧。 | `strict-types-value-objects` 观察字符串数量参数如何被 `TypeError` 拦下，以及值对象如何守住不变量。 |
-| Composer/autoload 思想 | 避免手写大量 `require`，让包、类和文件组织可预测。 | PHP 运行时提供 `spl_autoload_register`，Composer 在此基础上生成自动加载器并按 PSR-4 映射命名空间。 | `collections-arrays` 的 README 会提示真实项目如何把对象移动到 `src/` 并交给 Composer autoload。 |
+| Composer/autoload 思想 | 避免手写大量 `require`，让包、类和文件组织可预测。 | PHP 运行时提供 `spl_autoload_register`，Composer 在此基础上生成自动加载器并按 PSR-4 映射命名空间。 | `namespaces-autoload-manual` 用标准库手写极小 autoload，理解 Composer 背后的机制。 |
 | Throwable 错误模型 | 把业务失败、类型错误和系统错误放到统一的捕获边界中处理。 | PHP 7 以后用 `Throwable` 作为 `Exception` 与 `Error` 的共同接口，让应用能统一记录、恢复或转换响应。 | `throwable-recovery` 区分可恢复的业务异常、类型错误和最终清理逻辑。 |
+| readonly 与不可变对象 | 防止配置、命令和值对象在传递过程中被意外修改。 | PHP 用 `readonly` 属性提供轻量不可变承诺，同时保留对象构造器中的业务校验。 | `readonly-objects` 展示创建后不可改的报表配置。 |
+| generator 与迭代器 | 大量数据不应总是一次性放进数组。 | `yield` 让函数逐步产生值，适合日志、分页、文件和批处理。 | `generators-iterators` 展示懒序列和数据管道。 |
 
 ## 深入理解与对比练习
 
@@ -48,11 +50,18 @@ PHP array 同时承担列表、映射和轻量结构体的角色，非常方便�
 
 现代 PHP 中，`Exception` 和 `Error` 都实现 `Throwable`。业务可恢复失败通常用自定义异常表达，类型错误、解析错误等则更偏程序缺陷。学习 `throwable-recovery` 时，可以分别制造业务异常和类型错误，观察应该捕获到哪一层。真实项目不要在业务深处吞掉所有 `Throwable`；更常见的做法是在框架边界统一记录日志、转换响应。
 
+### readonly 和 generator 是现代工程的两种相反力量
+
+`readonly` 把状态固定下来，让值对象在系统里传递时更可预测；generator 则把数据延迟展开，让大量数据不必一次性进入内存。一个强调稳定快照，一个强调顺序流动。学习 PHP 时同时理解这两者很重要：配置、命令、金额适合不可变对象；日志、分页、文件行适合生成器。不要把所有数据都变成数组，也不要把所有对象都设计成可变服务。
+
 ## 教学例子索引
 
 - [strict-types-value-objects](examples/strict-types-value-objects/)：用金额值对象、类型签名和 `strict_types` 观察现代 PHP 如何把错误挡在边界。
 - [collections-arrays](examples/collections-arrays/)：用购物车数据展示数组适合边界处理，对象适合承载稳定业务概念。
 - [throwable-recovery](examples/throwable-recovery/)：模拟请求生命周期中的统一错误处理、恢复策略和 `finally` 清理。
+- [namespaces-autoload-manual](examples/namespaces-autoload-manual/)：用 `spl_autoload_register` 理解 namespace、类文件和 Composer autoload 的关系。
+- [readonly-objects](examples/readonly-objects/)：用 readonly 属性表达创建后不再改变的配置和值对象。
+- [generators-iterators](examples/generators-iterators/)：用 `yield` 构建懒序列，理解大数据流式处理。
 
 ## 学习检查
 
@@ -61,3 +70,5 @@ PHP array 同时承担列表、映射和轻量结构体的角色，非常方便�
 - `strict_types=1` 能防住什么问题？它不能替代哪些校验，例如金额范围、货币代码或外部输入验证？
 - Composer 的 autoload 带来的不只是“少写 require”。它怎样影响目录结构、命名空间和团队协作？
 - 捕获 `Throwable` 时，哪些错误可以恢复并返回友好响应，哪些错误应该记录后失败？为什么不要把所有异常都悄悄吞掉？
+- `readonly` 保护的是哪一层不可变？如果属性指向可变对象，还需要哪些额外约束？
+- generator 相比数组节省了什么？它又牺牲了哪些能力，例如随机访问和重复遍历？
