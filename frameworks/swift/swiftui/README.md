@@ -8,13 +8,32 @@ SwiftUI 解决的是 Apple 平台 UI 的表达、组合、状态传播和生命�
 
 它不直接替代所有底层能力。复杂文本排版、精细手势、平台私有控件、老项目中的 UIKit/AppKit 集成，仍可能需要混合使用 UIKit、AppKit 或 `UIViewRepresentable`/`NSViewRepresentable`。学习 SwiftUI 的关键不是背控件 API，而是理解“状态如何流动，副作用放在哪里，视图为什么应该保持轻量”。
 
+## 解决的问题
+
+在 UIKit/AppKit 的命令式模型里，开发者通常要同时维护“数据是什么”和“界面现在被手动更新到什么状态”。任务标题变了，要找到 label 并改 text；完成状态变了，要刷新 cell、切换 accessory、更新计数、处理复用后的旧状态；窗口进入后台、列表重新加载、主题切换、动态字体变化时，还要保证每个控件都没有漏掉同步。这类代码不是不能写，而是随着页面变多会让 UI 状态和业务状态形成两份事实来源。
+
+SwiftUI 主要解决六类 Apple 平台 UI 痛点：
+
+- 命令式刷新分散：传统代码常把创建控件、设置约束、注册事件、刷新数据写在不同生命周期方法里。SwiftUI 把界面写成 `body`，让“当前状态应该呈现什么”集中在一个可组合描述中。
+- 状态同步困难：输入框、列表行、完成数量、按钮禁用态都可能依赖同一份数据。SwiftUI 用 `@State`、`@Binding`、`@Observable` 和 `@Environment` 建立明确的状态所有权与传递路径。
+- 布局和适配成本高：UIKit/AppKit 需要手动管理约束、stack、cell 高度和平台差异。SwiftUI 用 `VStack`、`HStack`、`List`、`frame`、修饰符和环境值描述布局意图，由框架按平台和系统设置完成适配。
+- 列表与复用细节容易泄漏：传统 table/collection view 要处理 data source、delegate、cell reuse、diff 和点击回调。SwiftUI 的 `List($store.tasks)` 直接绑定可识别数据集合，让每一行由 `Identifiable` 数据生成。
+- 生命周期入口太多：`viewDidLoad`、`viewWillAppear`、window delegate、scene delegate 很容易承载过多副作用。SwiftUI 用 `App`、`Scene`、`.task`、`.onAppear`、`.onChange` 把启动、窗口和视图事件放在更贴近声明式结构的位置。
+- 预览和测试反馈慢：传统 UI 往往需要跑完整 App 才能看到页面。SwiftUI 的 `#Preview` 能直接构造视图快照；状态模型也可以脱离 UI 单独测试。
+
+quickstart 中的任务列表故意选择很小的需求：新增任务、切换完成、显示剩余数量、清理已完成。它足够简单，却包含真实 App 中最常见的同步问题：同一次状态变化需要影响输入框、列表行、标题统计和按钮状态。SwiftUI 的价值就在于让这些更新从“到处找控件并手动刷新”变成“修改状态，界面由状态重新推导”。
+
 ## 设计思想
 
-SwiftUI 的核心思想是声明式 UI。`View` 是一个值类型描述，`body` 根据当前状态返回一棵视图树。开发者不直接操作真实控件，而是改变 `@State`、`@Binding`、`@Observable` 对象、环境值或外部模型，框架负责把变化映射到界面更新。
+SwiftUI 的第一条核心思想是声明式 UI。`View` 是一个值类型描述，`body` 根据当前状态返回一棵视图树。开发者不直接保存真实控件引用，也不在每次事件后逐个刷新 label、button 或 cell；开发者只改变状态，框架负责重新求值相关 `body`、比较新旧视图描述，并把必要变更提交给 UIKit/AppKit 和渲染系统。
 
-状态绑定是第二个核心。`@State` 表示视图拥有的局部状态，`@Binding` 表示子视图读写父视图状态的通道，`@Environment` 表示从外部注入的上下文，例如颜色方案、locale、dismiss action。真实项目通常还会把业务状态放进可观察模型，再由视图订阅。
+第二条思想是状态所有权要清晰。`@State` 表示当前视图拥有的局部状态，例如 quickstart 里的 `draftTitle` 和 `store`；`@Binding` 表示子视图读写父视图状态的通道，例如 `TaskRow` 通过 `$task.isDone` 切换父级数组中的任务；`@Observable` 表示可被视图追踪的业务状态模型，例如 `TaskStore` 的 `tasks` 和 `remainingCount`；`@Environment` 表示从视图树外部注入的上下文，例如 quickstart 里的 `colorScheme`。这些工具共同回答一个问题：谁拥有状态，谁能修改状态，谁只是读取状态。
 
-第三个思想是组合优先。SwiftUI 鼓励把页面拆成小 `View`，每个 `View` 只接收渲染所需的数据和回调。修饰符也是组合：`.padding()`、`.foregroundStyle()`、`.task()`、`.toolbar()` 都是在描述这棵视图树的附加行为。
+第三条思想是组合优先。SwiftUI 鼓励把页面拆成小 `View`，每个 `View` 只接收渲染所需的数据和回调。修饰符也是组合：`.padding()`、`.foregroundStyle()`、`.frame()`、`.task()`、`.toolbar()` 都是在描述视图树的附加行为，而不是立刻改变某个已经存在的控件。quickstart 把 `TaskListView` 拆出 `header`、`composer`、`footer` 和 `TaskRow`，目的就是让读者看到：复杂页面可以由小的声明式片段拼接出来。
+
+第四条思想是平台生命周期被提升为语言级入口。`@main struct LearningTasksApp: App` 代替了大量样板启动代码，`WindowGroup` 描述窗口集合，`Scene` 负责承接平台窗口生命周期。对 macOS、iOS、watchOS、visionOS 来说，SwiftUI 不是简单的控件库，而是一套从 app 启动、状态传播、布局、列表到 preview 的应用模型。
+
+第五条思想是可预览、可替换、可测试。因为 `View` 是状态到 UI 的描述函数，`#Preview` 可以直接创建 `TaskListView()` 观察结果；因为业务变化集中在 `TaskStore`，后续可以为 `add(title:)`、`clearCompleted()` 和过滤逻辑写单元测试；因为依赖可以通过构造函数或 environment 注入，真实服务和 mock 服务能在运行、预览、测试中切换。
 
 ## 架构模型
 

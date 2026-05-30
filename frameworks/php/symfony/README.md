@@ -8,15 +8,31 @@ Symfony 解决的是可组合、可维护、可显式演进的 PHP 工程问题�
 
 Symfony 不追求把所有能力都包装成最短语法。相比 Laravel，它通常更显式：服务定义、Bundle、配置文件、Kernel、事件订阅器、编译期容器都需要读者理解。这个成本换来的是边界清楚、可替换性强、组件生命周期明确。
 
+## 解决的问题
+
+PHP 企业 Web/API 的第一个长期痛点，是“入口能跑，但系统边界越来越糊”。小项目可以在 `public/index.php` 里解析请求、连接数据库、判断路由、输出 JSON；业务增长后，同一个文件或同一批全局函数会同时负责 HTTP、认证、日志、配置、错误处理和数据访问。Symfony 把入口压缩到只创建 Kernel，把请求处理交给 HttpKernel 管线，把业务协作交给服务容器，让应用从一开始就有明确边界。
+
+第二个痛点是组件化不足。企业项目常常需要复用路由、控制台命令、校验、事件、消息队列、模板、安全、缓存等能力。如果每个能力都和框架核心绑死，替换和测试会很困难。Symfony 把很多能力拆成独立组件：你可以只用 HttpFoundation 表达 Request/Response，只用 Routing 做路由匹配，只用 DependencyInjection 构建容器，也可以把它们组合成完整框架。这个设计解决的是“既要统一工程模型，又不想被单体黑盒锁死”的问题。
+
+第三个痛点是对象创建和配置散落。Controller 需要 Repository，Repository 需要 Client 或数据库连接，Subscriber 需要 Logger，命令需要业务 Service；如果到处 `new` 对象，测试替换和环境配置都会失控。Symfony 的 Container 在编译阶段读取服务定义、类型声明、参数和环境变量，构建一张可缓存的依赖图。普通场景用 autowire 自动装配，复杂场景用 YAML/PHP/XML 或 Bundle Extension 显式声明，既减少样板，也保留治理能力。
+
+第四个痛点是横切逻辑很难放对位置。认证、CORS、缓存头、异常转换、审计日志、性能追踪、调试工具栏都不是某一个 Controller 的业务，但又必须参与请求生命周期。Symfony 用 HttpKernel 事件和 EventDispatcher 暴露 `kernel.request`、`kernel.controller`、`kernel.response`、`kernel.exception` 等扩展点，让这些能力以监听器/订阅器接入，而不是散落在每个控制器方法里。
+
+第五个痛点是大型团队缺少约定。路由写在哪里、配置如何区分环境、第三方包如何注册服务、测试应该启动多少框架能力，如果没有统一模型，项目会很快变成个人风格集合。Symfony 通过 Kernel、Bundle、属性/配置路由、`config/` 目录、测试基类和 Composer 生态给出稳定约定，让长期维护、升级和代码审查更可控。
+
 ## 设计思想
 
-Symfony 的第一层思想是组件化。框架由多个独立组件组成：HttpFoundation 抽象 Request/Response，Routing 做路由匹配，HttpKernel 定义请求处理核心流程，DependencyInjection 构建服务容器，EventDispatcher 连接生命周期扩展点。完整框架只是把这些组件组合成默认工程形态。
+Symfony 的第一层思想是组件化。框架由多个独立组件组成：HttpFoundation 抽象 Request/Response，Routing 做路由匹配，HttpKernel 定义请求处理核心流程，DependencyInjection 构建服务容器，EventDispatcher 连接生命周期扩展点。完整框架只是把这些组件组合成默认工程形态。这样做解决了组件复用和框架可替换性问题：当你只需要 HTTP 对象或路由匹配时，不必启动整个应用；当你使用完整框架时，又能获得一套一致的生命周期。
 
-第二层思想是显式配置与自动装配并存。现代 Symfony 默认使用 autowire/autoconfigure，普通 Service 只要写构造函数类型声明即可被容器解析；同时它保留 YAML/PHP/XML 配置，让你能在复杂系统中精确控制参数、服务、环境差异和第三方 Bundle。
+第二层思想是 Kernel 作为应用组合根。`public/index.php` 不应该知道有哪些控制器、服务和 Bundle，它只负责把环境信息交给 Kernel。Kernel 注册 Bundle，加载容器配置，加载路由，并在运行时把 Request 交给 HttpKernel。这个模型解决了“入口文件越来越厚”的问题，也让测试、缓存预热、命令行和 HTTP 入口共享同一套应用装配方式。
 
-第三层思想是 HttpKernel。一次请求不是直接跳进控制器，而是经过 Kernel、事件、路由、参数解析、控制器调用、响应事件和异常处理。这个模型让日志、安全、缓存、调试工具栏、异常页面等横切能力可以通过事件和中间层接入。
+第三层思想是显式配置与自动装配并存。现代 Symfony 默认使用 autowire/autoconfigure，普通 Service 只要写构造函数或控制器参数的类型声明即可被容器解析；同时它保留 YAML/PHP/XML/PHP DSL 配置，让你能在复杂系统中精确控制参数、服务、环境差异和第三方 Bundle。自动装配解决日常样板，显式配置解决多实现、条件装配、环境隔离和团队治理。
 
-第四层思想是 Bundle 与配置扩展。Bundle 可以注册服务、加载配置、暴露命令、接入事件和提供资源。应用自身不一定要拆很多 Bundle，但理解 Bundle 能帮助你明白第三方包为什么安装后可以改变框架行为。
+第四层思想是 HttpKernel 请求管线。一次请求不是直接跳进控制器，而是经过 Kernel、事件、路由、参数解析、控制器调用、响应事件和异常处理。RouterListener 在 `kernel.request` 阶段匹配路由，ArgumentResolver 把路由参数和服务变成控制器实参，异常监听器把错误转成响应，响应监听器再补充 header 或调试信息。这个模型让日志、安全、缓存、调试工具栏、异常页面等横切能力可以通过事件和中间层接入。
+
+第五层思想是 Bundle 与配置扩展。Bundle 可以注册服务、加载配置、暴露命令、接入事件和提供资源。`FrameworkBundle` 把 HttpKernel、Routing、DependencyInjection、EventDispatcher 等组件接成默认 Web 应用；DoctrineBundle 接入 ORM；SecurityBundle 接入认证授权。应用自身不一定要拆很多 Bundle，但理解 Bundle 能帮助你明白第三方包为什么安装后可以改变框架行为。
+
+第六层思想是属性与配置并用。属性路由让“URL 属于哪个控制器方法”靠近代码，适合快速理解和局部修改；集中配置适合跨模块策略、环境差异和第三方包选项。Symfony 没有把一种方式推到极端，而是允许项目根据规模选择：小型 API 可以用属性和 MicroKernelTrait，复杂平台可以把服务、路由和 Bundle 选项拆到 `config/`。
 
 ## 架构模型
 
@@ -30,6 +46,8 @@ Symfony 的第一层思想是组件化。框架由多个独立组件组成：Htt
 - 配置层：`config/` 或 Kernel 内配置把参数、环境、Bundle 选项和服务装配起来。
 
 quickstart 使用 MicroKernelTrait，把配置和路由导入写在 `src/Kernel.php` 中，减少文件数量，同时保留真实 Symfony 框架结构。它用属性路由声明 API，用 `TaskRepository` 模拟数据访问，用 JSON 文件保存状态。
+
+把 quickstart 对应到这些思想，可以看到 Symfony 的分层非常具体：`composer.json` 决定组件和自动加载边界；`public/index.php` 保持薄入口；`src/Kernel.php` 是应用组合根；`TaskController` 只处理 HTTP 适配；`TaskRepository` 封装任务数据。框架帮你解决“如何接住请求、如何找到控制器、如何创建依赖、如何返回响应”，业务代码只需要表达“任务如何被查询和创建”。
 
 ## 请求/执行生命周期
 

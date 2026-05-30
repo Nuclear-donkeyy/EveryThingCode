@@ -8,17 +8,35 @@ Boost 解决的是标准库之外的大量通用需求：字符串算法、容�
 
 本仓库把 Boost 放在 CMake 之后学习，是因为真实项目中通常需要先理解构建和依赖，再判断一个 Boost 组件是 header-only、需要链接库，还是需要额外编译选项。
 
+## 解决的问题
+
+C++ 标准库提供了语言级的共同基础，但真实工程常常会遇到“标准库有边界，业务又不能等标准演进”的空白区。比如字符串切分、大小写处理、路径兼容、日期时间计算、命令行参数、序列化、网络协议、异步 I/O、图算法、数学统计、单元测试、跨平台进程和文件抽象等问题，用纯标准库当然可以写，但每个团队都手写一套会带来重复、边界遗漏和跨平台差异。
+
+Boost 解决的第一类问题是“通用能力缺口”。标准库之外的算法和容器往往不是业务核心，却会反复出现在解析、清洗、转换、缓存和适配层。Boost.Algorithm 让字符串处理保留泛型算法风格，Boost.Container 提供 `small_vector` 这类带明确性能取舍的容器，Boost.DateTime/Chrono、Boost.Filesystem、Boost.JSON/Serialization 则把时间、路径和数据格式从临时工具函数提升为可复用库。
+
+第二类问题是“跨平台和系统编程复杂度”。网络、文件、线程、定时器、进程间通信在不同平台上 API 差异很大。Boost.Asio 用统一的异步 I/O 抽象包住 socket、timer、executor 和事件循环；Boost.Beast 在 Asio 之上提供 HTTP/WebSocket；Boost.Process、Interprocess、Filesystem 等库让系统边界更像普通 C++ 对象，而不是散落在各处的条件编译。
+
+第三类问题是“标准化前哨”。很多能力在进入标准库之前，需要多年生产验证和接口打磨。Boost 曾经验证过 smart pointer、regex、filesystem、thread、optional、variant、any 等设计；即使某些库后来没有直接进入标准，也提供了理解现代 C++ API 设计的样本。学习 Boost 的价值不只是会调用某个函数，更是理解 C++ 社区如何把复杂问题沉淀为泛型、可组合、跨平台的库。
+
+Boost 不解决的是应用架构本身：它不会替你规定 MVC、分层、目录结构或服务治理。它更像一组可靠零件，帮助你避免在非核心问题上重复造轮子；你的任务仍然是把这些零件放在清晰的领域边界后面。
+
 ## 设计思想
 
-Boost 的重要思想是“泛型、组合、零成本倾向和标准化前哨”。许多 Boost 库偏向模板和 header-only，让类型在编译期组合，运行时只留下必要成本。它也非常重视和标准库风格兼容，例如使用迭代器、range、allocator、异常、RAII 和值语义。
+Boost 的第一条设计思想是“贴近标准库，而不是另起一套世界”。许多 Boost API 使用迭代器、range、allocator、异常、RAII、值语义和泛型函数，所以它们可以自然嵌入普通 C++ 代码。quickstart 中 `boost::algorithm::split` 接收标准字符串和谓词，结果写入 `std::vector<std::string>`；`boost::container::small_vector<int, 4>` 也能像普通容器一样参与 `std::accumulate`。这正体现了 Boost 不是替代标准库，而是沿着标准库的接口习惯补足能力。
 
-另一个思想是实验与沉淀。Boost 库通常需要经过评审，文档、接口、可移植性和测试都会被讨论。即使某个库最终没有进入标准库，它也能代表一类成熟问题的 C++ 解法。学习 Boost 不是为了记住每个库，而是学习如何读高质量 C++ API：接口如何表达所有权、错误如何传播、模板参数如何约束、默认值如何兼顾易用和性能。
+第二条思想是“用类型和模板表达取舍”。Boost 经常把性能、所有权、容量、错误语义放进类型签名里，而不是藏在运行时约定中。`small_vector<int, 4>` 的 `4` 明确表达了“小规模数据优先放在对象内部”的策略；`boost::lexical_cast<int>` 明确表达目标类型，转换失败时抛出 `boost::bad_lexical_cast`，调用方可以在一个边界集中处理无效输入。
+
+第三条思想是“header-only 与 compiled library 并存”。字符串算法、类型工具、许多容器和元编程工具只需要 include headers；但 Filesystem、Program_options、Regex、Thread、Serialization 等库通常需要链接编译好的二进制组件。这个组合让小工具可以轻量接入，也让复杂系统能力保持可维护的实现边界。CMake 中 `Boost::headers` 和 `Boost::<component>` 的区别，本质上就是把这种依赖形态显式写进构建图。
+
+第四条思想是“组合优于框架接管”。Boost.Asio 不强迫你采用某个 Web 框架，它提供 executor、I/O object、async operation 和 completion handler；Boost.Beast 不接管服务结构，而是在 Asio 的异步模型上提供 HTTP/WebSocket 解析与写入；Boost.Program_options 不规定 CLI 应用目录，只把参数声明、解析和帮助信息变成库能力。Boost 的边界通常停在“解决一个清晰通用问题”，剩下的工程组织仍交给项目本身。
+
+第五条思想是“评审、可移植性和标准化沉淀”。Boost 库通常需要经过社区评审，接口、文档、测试、平台兼容和异常安全都会被讨论。即使某个库最终没有进入标准库，它也能代表一类成熟问题的 C++ 解法。学习 Boost 不是为了记住每个库，而是学习如何读高质量 C++ API：接口如何表达所有权，错误如何传播，模板参数如何约束，默认值如何兼顾易用和性能。
 
 ## 架构模型
 
 Boost 不是一个单体框架，而是许多库的集合。使用方式大致分两类：header-only 库只需要 include 头文件；需要编译的库还要在构建系统中链接二进制库。CMake 中通常用 `find_package(Boost REQUIRED)` 或具体组件查找，再把 `Boost::headers` 或组件 target 链接到项目 target。
 
-本案例选择 header-only 能力，降低运行门槛：`boost::algorithm` 做字符串清洗和切分，`boost::container::small_vector` 展示小对象优化容器，`boost::lexical_cast` 展示字符串到数字的转换与异常处理。
+本案例选择 header-only 能力，降低运行门槛：`boost::algorithm` 做字符串清洗和切分，`boost::container::small_vector` 展示小对象优化容器，`boost::lexical_cast` 展示字符串到数字的转换与异常处理。它故意不使用 Asio、Beast、Program_options 这些需要更多上下文的组件，因为第一课更适合先看清“一个 Boost 组件如何进入普通 C++ target”。
 
 ## 请求/执行生命周期
 

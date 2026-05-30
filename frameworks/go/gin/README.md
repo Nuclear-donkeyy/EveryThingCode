@@ -8,15 +8,33 @@ Gin 主要解决 JSON API 和 HTTP 服务的工程效率问题。它适合后台
 
 Gin 不负责数据库建模、业务分层、依赖注入、服务治理和配置中心。它也不是完整的企业应用框架。真实项目中，Gin 应该停留在 HTTP 适配层：解析请求、调用业务、组织响应；核心业务最好仍然使用普通 Go 类型和接口表达。
 
+## 解决的问题
+
+如果只用 `net/http`，一个任务 API 很快就会写出清晰但重复的样板代码：每个 handler 都要判断 method、解析路径、读取 JSON、设置 `Content-Type`、编码错误响应、串联日志和恢复中间件。Go 1.22 之后的 `ServeMux` 已经支持 method pattern 和路径参数，足够表达很多服务；但当 API 数量变多，重复点通常会集中在以下几类。
+
+第一类是路由组织。标准库可以注册 `GET /tasks/{id}`，但版本前缀、管理后台前缀、认证中间件和业务路由之间的关系需要自己约定。项目里常见 `/api/v1`、`/admin`、`/webhook` 等分组，如果每条路由都手写完整 path，后期移动前缀或统一加认证会变得琐碎。Gin 用 `Engine` 表示整个 HTTP 入口，用 `RouterGroup` 表示带公共前缀和公共中间件的一组路由，让“这一批路由共享什么规则”直接出现在代码结构里。
+
+第二类是输入解析和错误响应。标准库 handler 里通常要手写 `json.NewDecoder(r.Body).Decode(&input)`，再补字段校验、空 body 处理、`Content-Type` 约束和错误 JSON。Gin 的 `ShouldBindJSON` 把 JSON 解码和基础验证收进一个入口，结构体 tag 把字段名和约束放在 DTO 上。它不会替你设计业务规则，但能让“请求体不合法就返回 400”成为统一动作。
+
+第三类是路径参数、查询参数和响应工具。标准库里路径参数来自 `r.PathValue("id")`，查询来自 `r.URL.Query()`，响应还要自己写 header 和 encoder。Gin 把这些聚合到 `*gin.Context`：`c.Param("id")` 读路径参数，`c.Query("done")` 读查询参数，`c.JSON(status, value)` 输出 JSON。结果是 handler 更短，读者可以把注意力放在协议适配和业务调用上。
+
+第四类是中间件链。标准库中间件是 `func(http.Handler) http.Handler`，模型很稳定，但每个中间件都要自己决定如何包装、如何提前返回、如何在响应后记录状态码。Gin 中间件统一为 `gin.HandlerFunc`，通过 `c.Next()` 进入后续链路，通过 `c.Abort()` 停止后续 handler，并能从 `c.Writer.Status()` 读取响应状态。日志、恢复、request id、认证、限流可以挂在全局 router、某个 route group 或单条路由上。
+
+第五类是测试入口。标准库和 Gin 都能用 `httptest`，差异在于 Gin 的测试通常围绕一个 `*gin.Engine` 展开。只要把 router 装配写成 `setupRouter(store)`，测试就能直接调用 `router.ServeHTTP(recorder, request)`，完整覆盖路由树、中间件、绑定和 handler，而不需要监听真实端口。
+
+所以 Gin 解决的不是“Go 标准库不能写 Web 服务”，而是当 API 进入多路由、多中间件、多 JSON DTO、多错误格式时，把常见重复工作收束到一致的框架语义里。它提升的是 HTTP 适配层效率；业务层的建模、事务、权限和数据一致性仍然需要自己设计。
+
 ## 设计思想
 
-Gin 的第一层思想是路由树。你用 `router.GET`、`router.POST`、`group.PATCH` 注册路由，Gin 内部把 method/path 组织成高效查找结构。路径参数如 `/tasks/:id` 可以通过 `c.Param("id")` 获取。
+Gin 的第一层思想是把 HTTP 入口显式建成一棵路由树。`gin.Engine` 同时实现了 `http.Handler`，因此最后仍然能交给标准库 `http.Server`；但在 Engine 内部，`router.GET`、`router.POST`、`group.PATCH` 会把 method/path 组织成适合快速匹配的结构。路径参数如 `/tasks/:id` 可以通过 `c.Param("id")` 获取。与 `net/http` 相比，Gin 更强调用框架方法声明路由，而不是直接围绕 `ServeMux` 和 `http.HandlerFunc` 组合。
 
-第二层思想是中间件链。Gin 中间件类型是 `gin.HandlerFunc`，它接收 `*gin.Context`，可以在调用 `c.Next()` 前后执行逻辑。日志、恢复、request id、认证、限流、CORS 都可以挂在全局 router、路由组或单个路由上。与标准库中间件相比，Gin 中间件直接操作 `gin.Context`，写法更集中，但业务代码也更容易依赖框架类型。
+第二层思想是把公共规则贴在最合适的层级上。全局中间件属于所有请求，例如 `gin.Recovery()`；路由组中间件属于一批 API，例如 `/api` 下的认证；单路由中间件属于某个危险操作，例如删除前的权限检查。`RouterGroup` 不是简单的字符串拼接，它表达的是“这些 handler 共享前缀和横切逻辑”。这能减少重复注册，也能让团队一眼看出 API 边界。
 
-第三层思想是 `gin.Context`。它封装了请求、响应 writer、路径参数、查询参数、绑定、响应方法和中间件控制能力。`gin.Context` 不是标准库的 `context.Context`，但可以通过 `c.Request.Context()` 获取标准 context，并继续传给业务层或数据库。
+第三层思想是中间件链。Gin 中间件类型是 `gin.HandlerFunc`，它接收 `*gin.Context`，可以在调用 `c.Next()` 前后执行逻辑。日志、恢复、request id、认证、限流、CORS 都可以挂在全局 router、路由组或单个路由上。与标准库中间件相比，Gin 中间件直接操作 `gin.Context`，写法更集中，也更容易读取和修改响应状态；代价是中间件与 Gin 框架类型绑定更强。
 
-第四层思想是绑定和验证。`ShouldBindJSON` 可以把请求体绑定到结构体，结构体 tag 如 `json:"title" binding:"required,min=3"` 让字段名、必填规则和最小长度靠近 DTO。绑定失败时，handler 应返回清晰的 `400 Bad Request`。
+第四层思想是 `gin.Context`。它封装了请求、响应 writer、路径参数、查询参数、绑定、响应方法和中间件控制能力。`gin.Context` 不是标准库的 `context.Context`，不要把它一路传进业务层或数据库；但可以通过 `c.Request.Context()` 获取标准 context，并继续传给 service、repository 或外部 client。这样 HTTP 层享受 Gin 的便利，业务层仍保持普通 Go 形状。
+
+第五层思想是绑定和验证靠近 DTO。`ShouldBindJSON` 可以把请求体绑定到结构体，结构体 tag 如 `json:"title" binding:"required,min=3"` 让字段名、必填规则和最小长度靠近输入模型。绑定失败时，handler 应返回清晰的 `400 Bad Request`。更复杂的跨字段规则、权限规则和状态迁移规则仍应放在业务层，避免把业务语义塞进 HTTP tag。
 
 Gin 的常见工程取舍是：handler 层更短，约定更集中；但如果业务层直接接收 `*gin.Context`，将来测试、复用和换框架都会变难。因此示例让 store 方法接收普通参数，只有 handler 使用 Gin 类型。
 

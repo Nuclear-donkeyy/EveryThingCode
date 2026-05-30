@@ -14,17 +14,39 @@ ASP.NET Core 解决的是“如何在 .NET 中构建可维护、可部署、可�
 
 它不替你解决所有业务问题。领域建模、数据库设计、缓存一致性、分布式事务、权限模型、可观测性策略仍然需要应用自己设计。ASP.NET Core 的价值在于把这些能力放进统一的 Host 和请求生命周期中，让应用可以按清晰边界组合。
 
+## 解决的问题
+
+如果不用 ASP.NET Core 这一层平台，.NET Web 服务很快会遇到一组重复但棘手的问题：HTTP 请求进入应用后由谁接住，日志、异常、认证、授权、CORS、压缩、限流这些横切逻辑按什么顺序执行，业务 endpoint 如何从 URL、query、header、body 和服务容器中拿到输入，以及应用启动、关闭、配置、日志、后台服务如何统一管理。ASP.NET Core 的核心价值不是“少写几行路由”，而是把这些基础设施问题整理成稳定的应用模型。
+
+第一个痛点是 HTTP 管线容易失控。小项目可以在每个 handler 里写日志、try/catch、权限判断和响应格式；项目变大后，这些逻辑会散落到几十个 endpoint 中，顺序不一致，漏掉也很难发现。ASP.NET Core 用 middleware pipeline 把横切逻辑变成有顺序的链：请求先经过前置中间件，再进入路由和业务处理，响应再沿链返回。quickstart 中的自定义 `app.Use(...)` 就是最小示范：它不关心具体业务，却能统一记录所有请求的状态码和耗时。
+
+第二个痛点是对象创建和生命周期混乱。没有 DI 时，endpoint 可能到处 `new TodoService()`、`new Repository()`，最终很难替换实现、共享配置或做测试。ASP.NET Core 内置 DI，把服务注册集中在 `builder.Services`，再由框架在 endpoint handler 中自动解析。quickstart 的 `AddSingleton<InMemoryTodoRepository>()` 和 `AddSingleton<TodoService>()` 展示了“依赖由容器装配，业务由服务表达”的边界。
+
+第三个痛点是配置散落。连接字符串、分页上限、功能开关、第三方 API 地址如果直接用硬编码或裸字符串读取，会让不同环境配置、校验和测试都变脆。ASP.NET Core 的 configuration system 会合并 `appsettings.json`、环境变量、命令行、User Secrets 和云端配置；Options 模式则把配置绑定成类型。quickstart 的 `TodoOptions` 把 `Todo:ApiName` 与 `Todo:MaxPageSize` 变成可注入、可校验的 C# 契约。
+
+第四个痛点是日志与可观测性不统一。Web 服务不只要返回结果，还要知道每次请求用了多久、是否异常、在哪个 endpoint 失败、配置是否加载正确。ASP.NET Core Host 默认集成 logging，middleware、endpoint、service 都能使用同一套日志抽象。quickstart 直接用 `app.Logger.LogInformation(...)`，真实项目可以把同一套日志输出到 console、OpenTelemetry、Application Insights 或集中式日志平台。
+
+第五个痛点是应用模型选择困难。轻量 API 需要快速写 endpoint，复杂业务需要 Controller、Filter、模型绑定和版本管理，服务端页面需要 Razor Pages，实时通信需要 SignalR，RPC 需要 gRPC。ASP.NET Core 用 endpoint routing 把 Minimal API、MVC、Razor Pages、SignalR 和 gRPC 放在同一套路由和 middleware 底座上。学习 Minimal API 并不是走捷径，而是在先看清共同底座。
+
+第六个痛点是数据访问和测试常常绑死在框架边缘。初学者容易把数据库操作直接写进 handler，导致无法单测，也很难把内存存储换成 EF Core。ASP.NET Core 本身不强制某个数据层模式，但它通过 DI、Options、Host 和测试服务器让替换变自然：quickstart 先用内存仓储讲清 endpoint -> service -> repository；接入 EF Core 时，通常把 `InMemoryTodoRepository` 换成注入 `DbContext` 的 scoped 服务，再用 `WebApplicationFactory` 跑完整 HTTP 管线测试。
+
 ## 设计思想
 
-ASP.NET Core 的第一个思想是“显式组合”。`Program.cs` 中的 `WebApplication.CreateBuilder(args)` 创建主机构建器，随后通过 `builder.Services` 注册依赖，通过 `app.Use...` 组合中间件，通过 `app.Map...` 声明 endpoint。读者应该把启动代码看成应用 wiring：这里决定应用拥有哪些能力，以及请求按什么顺序经过这些能力。
+ASP.NET Core 的第一个思想是“Host 统一应用生命周期”。`WebApplication.CreateBuilder(args)` 不只是创建一个 HTTP 路由器，它会建立配置系统、日志系统、服务容器、环境信息和应用生命周期。`AspNetCoreQuickstart.csproj` 使用 `Microsoft.NET.Sdk.Web`，表示项目要引用 ASP.NET Core shared framework，并按 Web 应用方式构建和运行。`builder.Build()` 之后得到的 `app` 则是已经装配好配置、DI 和日志的运行时对象。
 
-第二个思想是“中间件管线”。中间件本质上是一个接收 `HttpContext` 并决定是否调用下一个处理器的函数。它适合日志、异常处理、静态文件、CORS、认证、授权、压缩、限流等横切逻辑。顺序非常重要：异常处理中间件通常放前面，认证要在授权之前，endpoint 映射之后就进入具体业务处理。
+第二个思想是“显式组合”。`Program.cs` 中通过 `builder.Services` 注册依赖，通过 `app.Use...` 组合中间件，通过 `app.Map...` 声明 endpoint。读者应该把启动代码看成应用 wiring：这里决定应用拥有哪些能力、能力按什么顺序执行、哪些服务可以被 handler 注入。ASP.NET Core 不把这些选择藏在全局配置文件里，而是让应用入口成为可读的装配图。
 
-第三个思想是“依赖注入优先”。ASP.NET Core 内置 DI 容器，Minimal API handler 可以直接声明参数，例如 `TodoService service`、`IOptions<ApiBehaviorOptions> options`、`ILogger<T>`。框架会从容器、请求、路由、查询字符串或 body 中完成绑定。业务代码因此不需要手动 new 一堆依赖，测试时也更容易替换实现。
+第三个思想是“中间件管线”。中间件本质上是一个接收 `HttpContext` 并决定是否调用下一个处理器的函数。它适合日志、异常处理、静态文件、CORS、认证、授权、压缩、限流等横切逻辑。顺序非常重要：异常处理中间件通常放前面，认证要在授权之前，endpoint 映射之后就进入具体业务处理。quickstart 的计时中间件展示了最关键的心智模型：`await next()` 之前是请求进入，之后是响应返回。
 
-第四个思想是“配置分层”。应用配置可以来自 `appsettings.json`、`appsettings.{Environment}.json`、环境变量、命令行参数、用户机密或配置中心。代码不应该到处读取裸字符串，而是把相关配置绑定成 Options 类型，再通过 `IOptions<T>` 或 `IOptionsMonitor<T>` 注入。这样配置结构会变成可测试、可校验、可演进的代码契约。
+第四个思想是“endpoint routing 统一入口”。Minimal API 的 `MapGet`、`MapPost` 和 MVC Controller 的 action 最终都会成为 endpoint，并带有 HTTP 方法、路径、metadata、filter、authorization 等信息。quickstart 的 `app.MapGroup("/todos").WithTags("Todos")` 展示了路由分组：一组 API 可以共享前缀和元数据，未来也可以统一加鉴权、filter 或 OpenAPI 标签。
 
-第五个思想是“从轻到重的应用模型”。Minimal APIs 适合轻量 API 和小服务；MVC 适合控制器分层和复杂 Web API；Razor Pages 适合页面驱动的服务端 Web；Blazor、SignalR、gRPC 继续复用同一套 ASP.NET Core 基础设施。学习时不要把它们看成彼此割裂的框架，而要先抓住共同底座。
+第五个思想是“依赖注入优先”。ASP.NET Core 内置 DI 容器，Minimal API handler 可以直接声明参数，例如 `TodoService service`、`IOptions<TodoOptions> options`、`ILogger<T>`。框架会根据参数类型和位置，从 DI 容器、请求、路由、查询字符串或 body 中完成绑定。业务代码因此不需要手动 new 一堆依赖，测试时也更容易替换实现。quickstart 中 `TodoService` 依赖 `InMemoryTodoRepository`，这条依赖关系由构造函数表达，由容器装配。
+
+第六个思想是“配置分层 + Options 契约”。应用配置可以来自 `appsettings.json`、`appsettings.{Environment}.json`、环境变量、命令行参数、用户机密或配置中心。代码不应该到处读取裸字符串，而是把相关配置绑定成 Options 类型，再通过 `IOptions<T>` 或 `IOptionsMonitor<T>` 注入。quickstart 使用 `Bind(...).Validate(...).ValidateOnStart()`，让配置错误在应用启动时暴露，而不是等到某个请求打到接口才失败。
+
+第七个思想是“从轻到重的应用模型”。Minimal APIs 适合轻量 API 和小服务；MVC 适合控制器分层、复杂模型绑定、过滤器和大型 Web API；Razor Pages 适合页面驱动的服务端 Web；Blazor、SignalR、gRPC 继续复用同一套 ASP.NET Core 基础设施。学习时不要把它们看成彼此割裂的框架，而要先抓住共同底座：Host、middleware、endpoint routing、DI、configuration、logging。
+
+第八个思想是“数据访问是可替换边界”。ASP.NET Core 与 EF Core 配合紧密，但并不要求所有代码都直接依赖 `DbContext`。更稳妥的学习路径是先把业务用例放进 service，把外部状态放进 repository 或 data access 层；等到接入 EF Core 时，再让 DI 管理 `DbContext` 的 scoped 生命周期。这样 handler 仍然关注 HTTP 输入输出，service 关注业务规则，EF Core 关注持久化和查询。
 
 ## 架构模型
 

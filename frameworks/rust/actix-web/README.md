@@ -6,13 +6,35 @@ Actix Web 是 Rust 生态中成熟、高性能、资料丰富的 Web 框架，�
 
 Actix Web 不内置 ORM，也不强制使用某种项目分层方式。它提供的是 Web 层能力：`App` 组织应用，`Scope` 组织路由分组，handler 处理请求，extractor 提取输入，`web::Data` 共享状态，middleware 处理横切逻辑。
 
+## 解决的问题
+
+只用 Rust 标准库或底层 HTTP 库写 Web 服务时，困难通常不在“能不能收一个请求”，而在“长期维护一个高并发服务时，哪些边界由谁负责”。Actix Web 把这些边界显式建模出来，让业务代码不用反复处理底层细节。
+
+第一个问题是高性能服务的运行模型。Rust 本身提供所有权、线程安全和零成本抽象，但 Web 服务还需要监听 socket、创建 worker、调度 async task、复用连接、限制阻塞操作对吞吐的影响。Actix Web 用 `HttpServer` 和 actix runtime 管理这些运行时职责：你把应用工厂交给 `HttpServer::new`，框架按 worker 创建应用实例并驱动异步 handler 执行。开发者仍要理解阻塞边界，但不用自己写完整的事件循环和连接调度。
+
+第二个问题是路由和模块组织。API 增多后，如果每个路径都散落在启动函数里，版本前缀、权限分组、资源路径和 handler 的关系会很快变乱。Actix Web 用 `App`、`Scope`、`Resource` 和 `Route` 分层组织 HTTP 结构：`App` 是应用外壳，`Scope` 表示 `/api`、`/api/v1` 这类前缀，resource 表示资源路径，route 表示 method 到 handler 的映射。
+
+第三个问题是共享状态。Rust 不允许随意共享可变数据，这对正确性很好，但 Web 服务确实需要共享配置、连接池、缓存、仓储或服务对象。Actix Web 用 `web::Data<T>` 表达“这是应用级依赖”，内部通常由 `Arc` 支撑 clone 到不同 worker；如果还需要进程内可变状态，则由你明确选择 `Mutex`、`RwLock`、原子类型或数据库事务。框架负责把依赖送到 handler，线程安全策略仍由类型系统约束。
+
+第四个问题是请求输入转换。HTTP 输入分散在 path、query、header、body 和应用状态里，手写解析会让 handler 充满样板代码和错误处理。Actix Web 的 extractor 把这些来源映射为函数参数：`web::Path<u64>` 解析路径参数，`web::Json<CreateNote>` 解析并反序列化 JSON body，`web::Data<AppState>` 取应用状态。handler 的签名因此成为 API 输入契约。
+
+第五个问题是响应、横切逻辑和测试。真实服务需要统一状态码、JSON 响应、错误响应、日志、鉴权、压缩、CORS、请求 ID 和无需真实端口的测试。Actix Web 用 `Responder`/`HttpResponse` 统一输出，用 middleware 包装横切逻辑，用 `actix_web::test` 在内存中初始化 `App` 并调用 route。这样测试可以覆盖路由、extractor、状态变化和响应格式，而不必启动完整进程。
+
 ## 设计思想
 
-Actix Web 的历史来自 Actix actor 生态。早期 Actix 更强调 actor、message、arbiter 和 mailbox；Actix Web 今天的日常 API 已经不要求你用 actor 写业务，但这种历史影响仍然存在：它很重视 runtime、worker、服务工厂、并发边界和消息驱动式的执行模型。
+Actix Web 的历史来自 Actix actor 生态。早期 Actix 更强调 actor、message、arbiter 和 mailbox；Actix Web 今天的日常 API 已经不要求你用 actor 写业务，但这种历史影响仍然存在：它很重视 runtime、worker、服务工厂、并发边界和消息驱动式的执行模型。理解这一点，有助于理解为什么 `HttpServer::new` 接收的是一个应用工厂，而不是一个已经构建好的全局 `App`。
 
-在编码体验上，Actix Web 倾向于“应用构建器 + attribute macro + extractor”。你可以用 `App::new()` 声明应用，用 `web::scope("/api")` 分组，用 `#[get("/health")]` 或 `web::resource(...).route(...)` 声明路由。handler 是 async 函数，参数中的 `web::Path`、`web::Json`、`web::Query`、`web::Data` 会由框架自动提取。
+Actix Web 的第一个核心思想是“应用是服务工厂”。`App` 最终会被转换成实现 service trait 的对象，`HttpServer` 为每个 worker 调用工厂闭包生成一套应用服务链。这种模型让每个 worker 可以拥有自己的路由表、中间件链和轻量本地状态，同时通过 `web::Data` clone 共享真正需要跨 worker 共享的依赖。quickstart 中的 `let state = new_state(); HttpServer::new(move || App::new().app_data(state.clone()))` 正是这个思想的最小形态。
 
-它的另一个核心思想是显式共享状态。`web::Data<T>` 通常包裹 `Arc<T>`，让多个 worker 可以共享数据库连接池、配置、服务对象或内存仓储。你需要自己决定哪些状态可变，哪些状态只读，哪些操作应交给数据库事务处理。
+第二个核心思想是“HTTP 结构用组合表达”。`App::new()` 表示应用根，`web::scope("/api")` 表示一组路径前缀，`web::resource("/notes")` 表示资源，`web::get().to(list_notes)` 表示 method 到 handler 的映射。大型项目可以把每个模块暴露为 `configure_xxx(config: &mut ServiceConfig)`，再由启动层统一 `.configure(...)`，这样路由组织和业务模块会保持同构。
+
+第三个核心思想是“handler 签名即请求契约”。Actix Web 不要求你在 handler 开头手写 parse path、parse body、取状态；它根据函数参数类型运行 extractor。`get_note(path: web::Path<u64>, state: web::Data<AppState>)` 说明这个 handler 需要一个路径 ID 和应用状态；`create_note(state, payload: web::Json<CreateNote>)` 说明请求体必须能反序列化为 `CreateNote`。当输入不合法时，extractor 可以在进入业务逻辑前直接产生错误响应。
+
+第四个核心思想是“响应也是类型驱动”。返回 `impl Responder` 可以是 `web::Json<T>`、`HttpResponse` 或其他实现了响应转换的类型。quickstart 中 `health` 返回 `web::Json(Health { ... })`，`get_note` 在存在时返回 `HttpResponse::Ok().json(note)`，不存在时返回 `HttpResponse::NotFound().body(...)`。这让简单接口保持简短，同时允许复杂接口精确控制状态码、header 和 body。
+
+第五个核心思想是“横切逻辑留给 middleware，业务入口保持薄”。日志、鉴权、CORS、压缩、限流、请求 ID 不应散落到每个 handler。Actix Web 的 middleware 包在 service chain 外层，能在 handler 之前/之后处理请求与响应。quickstart 为了保持最小没有引入 middleware；真实项目通常会在 `App::new()` 后接 `.wrap(Logger::default())`、鉴权 middleware 或错误转换层。
+
+与 Axum 对照看，Actix Web 更强调自己的 `App`/`Scope`/`ServiceFactory` 体系、attribute macro 和 extractor 组合，文档与存量项目也非常成熟；Axum 更直接拥抱 Tokio/Tower，把 `Router` 和 Tower layer 作为中心抽象。两者都能构建高质量 Rust Web 服务，Actix Web 的优势常体现在成熟度、高吞吐场景经验、内置测试工具和清晰的 worker/应用工厂模型上。
 
 ## 架构模型
 

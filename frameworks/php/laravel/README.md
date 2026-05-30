@@ -8,17 +8,35 @@ Laravel 解决的是 Web 应用从入口到上线的完整工程问题：如何�
 
 Laravel 不替你消除架构设计问题。复杂领域仍然需要清晰的 Service、DTO、Policy、事件和事务边界；高并发场景仍然要关注数据库连接、缓存、队列吞吐和 PHP-FPM/Octane 的部署模型。把所有逻辑塞进路由闭包或 Eloquent Model，短期很快，长期会让项目难以测试。
 
+## 解决的问题
+
+没有框架约束的 PHP Web/API 项目，最先遇到的问题通常不是“不会写功能”，而是每个功能都要重新拼装一遍基础设施。入口文件要自己处理 autoload、请求对象、响应序列化和异常；路由要自己从 `$_SERVER`、`$_GET`、`$_POST`、原始 JSON body 中判断方法和路径；配置要在环境变量、常量、全局数组和硬编码之间漂移。项目越大，这些“胶水代码”越容易变成真正的维护成本。
+
+路由和 HTTP 适配是第一类痛点。纯 PHP 可以很快写出一个 `if ($_SERVER['REQUEST_URI'] === ...)`，但当 API 增加路径参数、方法区分、验证错误、404/422/500 响应、跨域、认证和限流时，入口文件会迅速膨胀。Laravel 用 `routes/*.php`、`Route` Facade、路由参数约束、中间件和统一 Response API，把“URL 如何进入业务”变成可读、可测试、可组合的声明。
+
+对象创建和依赖管理是第二类痛点。业务代码一旦到处 `new` Repository、Client、Logger、Cache，就会很难替换实现，也很难在测试中注入假对象。Laravel 的 Service Container 通过类型声明自动解析依赖，用 Service Provider 处理接口绑定、单例生命周期和第三方服务注册。这样路由或控制器只声明自己需要什么，而不是负责知道每个对象如何创建。
+
+配置和环境差异是第三类痛点。开发、测试、预发布、生产往往有不同数据库、缓存、队列、邮件、日志和第三方密钥。如果配置散落在代码里，部署时只能靠人工搜索替换。Laravel 用 `.env`、`config/*.php`、`config()`、配置缓存和环境隔离，把运行环境差异集中管理，也让配置读取有固定入口。
+
+数据访问和数据库演进是第四类痛点。手写 SQL 可以工作，但表结构变化、分页、关系查询、批量赋值、测试数据、迁移回滚和团队协作会逐渐复杂。Laravel 用 Eloquent、Query Builder、Migration、Seeder、Factory 组成数据层工具箱：Eloquent 让常见 CRUD 与关系表达更接近领域对象；Migration 把数据库结构变化纳入版本控制；Factory/Seeder 让测试和本地演示有稳定数据。
+
+队列、定时任务和横切逻辑是第五类痛点。发送邮件、生成报表、同步外部系统不应该拖慢 HTTP 请求；认证、限流、日志、异常上报也不应该复制到每个接口里。Laravel 用 Queue、Job、Schedule、Event、Listener、Notification 和 Middleware，把“请求内同步处理”和“请求外异步处理”拆开，把横切逻辑放进可复用管线。
+
+测试和脚手架是第六类痛点。没有框架约定时，团队要自己决定测试如何启动应用、如何准备数据库、如何发起 HTTP 请求、如何调用命令行任务。Laravel 的 `artisan`、测试基类、Feature Test、`php artisan test`、`migrate`、`make:*` 命令，把常见工程动作变成统一入口。它解决的不是“少敲几行命令”，而是让团队用同一套流程创建文件、启动应用、验证行为。
+
 ## 设计思想
 
-Laravel 的第一层思想是约定优于配置。默认目录、默认命名、默认配置和 Artisan 命令让项目开局非常快。例如路由放在 `routes/`，服务放在 `app/`，公共入口在 `public/index.php`，配置来自 `.env` 与 `config/`。你可以覆盖这些约定，但先顺着它走更容易理解生态文档。
+Laravel 的第一层思想是约定优于配置。默认目录、默认命名、默认配置和 Artisan 命令让项目开局非常快。例如路由放在 `routes/`，服务放在 `app/`，公共入口在 `public/index.php`，命令行入口叫 `artisan`，配置来自 `.env` 与 `config/`。这套约定解决的是“每个团队都重新发明项目结构”的问题：新人进入项目后可以先按 Laravel 的标准路径寻找入口、路由、模型、迁移和测试，而不是从随机文件开始猜。
 
-第二层思想是 Service Container。容器负责创建对象、解析构造函数依赖、管理绑定和生命周期。控制器或路由闭包可以直接声明 `Request`、Repository、Service 等参数，Laravel 会尝试自动解析。这个机制让业务代码少写工厂和全局变量，也让测试更容易替换依赖。
+第二层思想是 Service Container。容器负责创建对象、解析构造函数依赖、管理绑定和生命周期。控制器或路由闭包可以直接声明 `Request`、Repository、Service 等参数，Laravel 会尝试自动解析。这个机制解决的是“依赖创建散落在业务代码里”的问题：业务入口表达需求，容器负责组装对象；测试时可以覆盖绑定，生产时可以切换实现。
 
-第三层思想是表达力。Route、Validator、Eloquent、Collection、Queue、Event、Notification、Policy 等 API 都追求可读性。Facade 看起来像静态调用，本质上通常是访问容器中的服务。学习时不要只停在“语法优雅”，要追问：这个调用背后解析了哪个服务，依赖在哪里绑定，错误如何冒泡。
+第三层思想是 Facade 与表达力。Route、Validator、Eloquent、Collection、Queue、Event、Notification、Policy 等 API 都追求可读性。Facade 看起来像静态调用，本质上通常是访问容器中的服务。它解决的是“基础设施调用啰嗦且不统一”的问题：`Route::get()`、`response()->json()`、`validator(...)->validate()` 让常见动作有稳定表达。学习时不要只停在“语法优雅”，要追问：这个调用背后解析了哪个服务，依赖在哪里绑定，错误如何冒泡。
 
-第四层思想是围绕数据模型构建应用。Eloquent 使用 Active Record 风格，把表、记录、关系、查询和持久化行为放到 Model 附近。它适合多数 CRUD 与后台系统，但在复杂领域里要避免让 Model 承担所有业务规则，可以把流程编排放进 Service 或 Action。
+第四层思想是围绕数据模型构建应用。Eloquent 使用 Active Record 风格，把表、记录、关系、查询和持久化行为放到 Model 附近。Migration 把结构变化写成代码，Seeder/Factory 把样例数据和测试数据写成代码。它们解决的是“数据库状态无法复现”的问题。Eloquent 适合多数 CRUD 与后台系统，但在复杂领域里要避免让 Model 承担所有业务规则，可以把流程编排放进 Service 或 Action。
 
-路由和中间件是 Laravel Web 层的核心。路由把 URL 与处理函数绑定，中间件在请求到达业务前后处理认证、限流、会话、CSRF、日志、跨域等横切逻辑。读 Laravel 项目时，先看路由，再看中间件栈，最后看 Controller/Service/Model，会比从任意类开始读更稳。
+第五层思想是把请求生命周期显式分段。路由把 URL 与处理函数绑定，中间件在请求到达业务前后处理认证、限流、会话、CSRF、日志、跨域等横切逻辑；队列和调度把耗时工作移出 HTTP 请求；异常处理把错误上报和响应格式集中到一个位置。读 Laravel 项目时，先看路由，再看中间件栈，最后看 Controller/Service/Model，会比从任意类开始读更稳。
+
+quickstart 有意保留 `composer.json`、`artisan`、`bootstrap/app.php`、`routes/api.php` 和 `TaskRepository` 这几个关键点。它们分别对应 Laravel 的五个核心思想：Composer 统一依赖与自动加载，Artisan 统一命令入口，Bootstrap 统一应用组装，Route 统一 HTTP 映射，Repository 展示容器解析和数据边界。这个案例虽然没有引入数据库、队列和完整中间件栈，但已经能看见 Laravel 如何把 PHP Web 项目的重复工程问题压进框架生命周期。
 
 ## 架构模型
 

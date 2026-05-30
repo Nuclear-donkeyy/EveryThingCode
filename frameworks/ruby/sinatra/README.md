@@ -8,13 +8,29 @@ Sinatra 解决的是“用最少结构写一个 HTTP 应用”的问题。它提
 
 它不适合直接承担大型全栈框架的全部职责。真实项目如果变复杂，需要开发者主动拆分 service、repository、配置、测试和部署结构。也正因为如此，Sinatra 是学习框架本质的好材料：没有太多自动约定遮挡，请求如何流动一眼可见。
 
+## 解决的问题
+
+轻量 Ruby API 最容易遇到的第一个问题是路由入口散乱。如果直接用 Rack 或手写 `case env["PATH_INFO"]`，HTTP 方法、路径匹配、参数读取和响应构造会混在一起，新增一个端点就要重复判断方法、解析 body、设置 header。Sinatra 用 `get "/tasks"`、`post "/tasks"` 这样的 DSL 把“哪种请求进入哪段代码”写成接近自然语言的 Ruby，路由表不需要额外配置文件也能保持可读。
+
+第二个问题是 Rack 入口和应用代码之间缺少清晰边界。Rack 只规定应用对象要响应 `call(env)` 并返回 `[status, headers, body]`，这很强大，但直接编写会让初学者过早面对底层协议细节。Sinatra 保留 Rack compatibility，让 `config.ru`、Puma、Rackup、Rack middleware 和 Rack::Test 都能直接接入，同时把常见的请求对象、响应状态、header、helper 封装成更好读的 API。
+
+第三个问题是横切逻辑会快速重复。JSON API 通常每个路由都要设置 `Content-Type`、解析 JSON、处理错误、记录日志或检查认证。如果每个路由块都手写这些逻辑，代码会变得短期直接、长期松散。Sinatra 提供 `before` filter、`helpers`、错误处理和 Rack middleware 接口，把“每个请求都要做”的事情从单个路由里拿出来。
+
+第四个问题是轻量框架容易把业务逻辑全部写进路由。Sinatra 不强制 MVC，也不内置 service/repository 目录，这给小项目很高自由度，但也要求开发者主动拆分。quickstart 把 `TaskRepository`、`TaskService` 和 `TaskApi` 放在同一个文件里教学，是为了展示边界：路由负责 HTTP，service 负责业务规则，repository 负责数据访问。项目变大后，这些类应拆到独立文件，而不是让路由块继续膨胀。
+
+第五个问题是测试入口不稳定。直接启动真实端口做测试慢且容易受环境影响；只测纯 Ruby 对象又覆盖不到 HTTP 状态码和响应头。Sinatra 因为是 Rack 应用，可以用 Rack::Test 直接向 `TaskApi` 发请求，不需要启动服务器，同时也能绕过 HTTP 直接测试 service。这让轻量 API 仍然可以保留分层测试策略。
+
 ## 设计思想
 
-Sinatra 的核心思想是轻量 DSL。`get "/tasks"` 表示处理 `GET /tasks`，`post "/tasks"` 表示处理创建请求，代码和 HTTP 语义几乎一一对应。对初学者来说，这种写法比完整 MVC 更容易建立“路由就是入口”的直觉。
+Sinatra 的核心思想是用 DSL 把 HTTP 协议翻译成 Ruby 代码，而不是把应用放进一套完整产品框架。`get "/tasks"` 表示处理 `GET /tasks`，`post "/tasks"` 表示处理创建请求，代码和 HTTP 语义几乎一一对应。对已经会编程但没写过 Ruby Web 的读者来说，这种写法能快速建立“路由就是入口，返回值就是响应 body”的直觉。
 
-第二个思想是 Rack first。Sinatra 应用本质上是 Rack application，可以被 `config.ru` 暴露给 Puma、Rackup 或其他 Rack 服务器。中间件、请求对象、响应三元组、测试工具都围绕 Rack 协议协作。
+第二个思想是 Rack first。Sinatra 应用本质上仍然是 Rack application，可以被 `config.ru` 暴露给 Puma、Rackup 或其他 Rack 服务器。这样做解决了两层问题：向下兼容 Ruby Web 的共同协议，向上给开发者更舒适的路由、helper、filter API。你可以先用 Sinatra 的 DSL 学会请求流，再逐步理解底层 Rack middleware 和 response triple。
 
-第三个思想是显式结构。Sinatra 可以把所有代码写在一个文件里，但本仓库案例刻意拆出 repository 与 service，让读者看到轻量框架并不等于把业务逻辑塞进路由；框架越轻，工程边界越需要开发者主动维护。
+第三个思想是 filter/helper 组合。`before` 适合放每个请求都要执行的动作，例如设置 JSON content type、认证、请求 ID 或日志上下文；`helpers` 适合放路由之间共享的小函数，例如 `json(payload)`。它们解决的是重复代码和横切逻辑污染路由的问题，但不会把应用变成隐式魔法：代码仍然在类里，执行顺序也很短。
+
+第四个思想是 subclass style。Sinatra 支持顶层 DSL，也支持 `class TaskApi < Sinatra::Base`。本仓库选择 subclass style，是因为它更适合教学和工程化：应用配置、helper、filter、路由都属于一个明确的类，`config.ru` 可以 `run TaskApi`，测试也可以直接引用 `TaskApi`。当一个进程里有多个 API 或多个 Rack app 时，subclass style 的边界更稳。
+
+第五个思想是显式结构。Sinatra 可以把所有代码写在一个文件里，但本仓库案例刻意拆出 repository 与 service，让读者看到轻量框架并不等于把业务逻辑塞进路由；框架越轻，工程边界越需要开发者主动维护。Sinatra 负责让 HTTP 入口清楚，应用自己的领域模型、持久化、验证和测试策略仍然要由团队设计。
 
 ## 架构模型
 
@@ -28,6 +44,8 @@ quickstart 使用 subclass style：
 
 这个结构保留了 Sinatra 的轻量表达，同时避免把所有状态和逻辑混在路由块里。真实项目可以继续把 repository、service、serializers、settings、tests 拆到独立目录。
 
+与 Rails 对照看，Sinatra 更像“把 HTTP 服务所需的最小工具交给你”：路由、请求、响应、filter、helper、Rack 入口。Rails 更像“把产品级 Web 应用的默认解法交给你”：MVC、ORM、migration、assets、mailers、jobs、generators、environments、测试目录。Sinatra 的优势是请求路径短、学习成本低、结构自由；代价是很多工程约定需要自己建立。Rails 的优势是默认能力完整、团队协作约定强；代价是框架层更多，理解请求流需要穿过更多抽象。
+
 ## 请求/执行生命周期
 
 一次 `GET /tasks` 请求大致经过这些阶段：
@@ -40,6 +58,8 @@ quickstart 使用 subclass style：
 6. Sinatra 把状态码、响应头和 body 交回 Rack。
 
 一次 `POST /tasks` 请求会额外读取 JSON body。案例中 `request.body.read` 取得原始请求体，`JSON.parse` 转为 Hash，再交给 service 创建任务。如果输入不合法，路由返回 `400`；如果创建成功，返回 `201`。
+
+这条链路能看到 Sinatra 的边界：Rack 负责把 HTTP 请求交给应用，Sinatra 负责匹配路由并提供请求/响应 helper，业务对象负责规则和数据。框架没有替你隐藏这些层，因此很适合用来学习 Web 框架到底在“省掉哪些重复劳动”。
 
 ## 工程结构
 

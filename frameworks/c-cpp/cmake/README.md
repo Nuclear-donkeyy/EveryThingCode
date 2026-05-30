@@ -8,13 +8,29 @@ CMake 解决的是“如何稳定、可移植地构建 C/C++ 工程”：源码�
 
 在本仓库中，CMake 作为 C/C++ 学习路径的第一站。只要你能看懂一个现代 `CMakeLists.txt`，后续理解 Qt、Boost、GoogleTest、fmt、OpenSSL、gRPC、Conan 和 vcpkg 都会轻松很多。
 
+## 解决的问题
+
+C/C++ 项目的第一个难点不是语法，而是“同一份源码怎样在不同机器上被正确编译、链接、测试和交付”。如果只靠手写编译命令，项目很快会被几类问题拖住。
+
+第一类是编译器和平台差异。Clang、GCC、MSVC 的命令行参数、默认标准、警告开关、运行时库和输出目录都不完全一样。Linux 常用 Make 或 Ninja，Windows 团队可能需要 Visual Studio 工程，macOS 团队可能需要 Xcode 工程。CMake 把这些差异收敛为生成器模型：你描述“要构建什么 target、需要什么特性”，再由 `cmake -G Ninja`、Visual Studio、Xcode 等 generator 生成对应平台的构建文件。
+
+第二类是 include path、link path 和依赖顺序。C/C++ 的头文件搜索路径、库搜索路径、链接顺序和编译宏经常相互影响。旧式工程会把 `-I`、`-L`、`-D`、`-l` 散落在全局变量里，一旦新增库或测试 target，就容易出现“在我机器能编译，在 CI 上找不到头文件”或“编译过了但链接失败”。现代 CMake 用 target 模型把需求挂到具体产物上，再通过 `PRIVATE`、`PUBLIC`、`INTERFACE` 明确哪些需求只属于自己，哪些要传播给下游。
+
+第三类是构建目录和缓存污染。直接在源码目录里生成对象文件、Makefile、IDE 临时文件和测试产物，会让仓库变脏，也会让 Debug/Release、不同编译器、不同平台互相干扰。CMake 的 out-of-source build 用 `cmake -S . -B build` 把源码树和构建树分开，同一个源码目录可以同时拥有 `build-debug/`、`build-release/`、`build-clang/` 等多个构建结果。
+
+第四类是安装、测试和 IDE 集成。真实项目不只是生成一个可执行文件，还要运行测试、安装头文件和库、让下游 `find_package` 找到自己、让 IDE 正确展示 include path 和编译宏。CMake 提供 `CTest`、`install()`、package config、compile commands、Visual Studio/Xcode generator 等机制，把构建系统从“能在命令行跑”推进到“能被团队、CI、IDE 和下游项目稳定消费”。
+
 ## 设计思想
 
-现代 CMake 的核心思想是 target-first。旧式写法喜欢全局设置 `include_directories()`、`add_definitions()` 和 `CMAKE_CXX_FLAGS`，这会让依赖关系散落在目录级作用域里。现代写法把可执行文件、静态库、动态库都看作 target，再通过 `target_compile_features`、`target_include_directories`、`target_link_libraries` 等命令把需求挂到具体 target 上。
+现代 CMake 的核心思想是 target-first，也就是先把工程看成一张 target 依赖图。可执行文件是 target，静态库和动态库是 target，第三方包通过 `find_package` 得到的 imported library 也是 target。你不再从“这一整棵目录要加哪些全局参数”出发，而是问“这个 target 要编译哪些源码、需要什么 C++ 标准、暴露哪些头文件、链接哪些库”。本仓库 quickstart 中的 `add_executable(cmake_quickstart src/main.cpp)` 就是在创建这张图里的第一个节点。
 
-另一个关键思想是 usage requirements，也就是依赖传播。如果一个库的公共头文件需要某个 include path，那么它应该以 `PUBLIC` 暴露；如果只在库实现内部使用，就用 `PRIVATE`；如果当前 target 不用但下游必须用，就用 `INTERFACE`。这三个词是理解 CMake 工程可维护性的入口。
+target-first 解决的是全局配置失控问题。旧式写法喜欢全局设置 `include_directories()`、`add_definitions()` 和 `CMAKE_CXX_FLAGS`，这会让依赖关系散落在目录级作用域里。现代写法把需求挂到具体 target 上：`target_compile_features(cmake_quickstart PRIVATE cxx_std_23)` 表示只有这个可执行文件需要 C++23；`target_compile_definitions(cmake_quickstart PRIVATE CMAKE_QUICKSTART_VERSION=...)` 表示版本宏只传给这个可执行文件，不污染未来可能新增的库或测试 target。
 
-CMake 也强调 out-of-source build：源码目录保持干净，构建产物进入 `build/`。这让你可以同时保留 Debug、Release、不同编译器、不同平台的构建目录，减少“构建缓存污染源码”的问题。
+另一个关键思想是 usage requirements，也就是依赖传播规则。如果一个库的公共头文件需要某个 include path，那么它应该以 `PUBLIC` 暴露；如果只在库实现内部使用，就用 `PRIVATE`；如果当前 target 不用但下游必须用，就用 `INTERFACE`。这三个词是理解 CMake 工程可维护性的入口。它们解决的是“库 A 能编译，但依赖 A 的库 B 拿不到正确编译条件”的问题。
+
+CMake 还强调 properties 和 generator 的分工。`CMakeLists.txt` 描述 target 的属性，例如标准、宏、源码、include path、链接库和安装规则；generator 负责把这些属性翻译成 Ninja、Makefile、Visual Studio 或 Xcode 能执行的文件。这样同一个项目描述可以服务多种平台，也让 IDE 能从构建系统中读取真实的编译参数。
+
+最后是 out-of-source build、CTest 和 package config。out-of-source build 让源码目录保持干净；CTest 让测试成为构建图的一部分；`install()` 与 package config 让项目能被别的 CMake 项目通过 `find_package` 消费。它们共同解决的是“本地能跑”到“团队可维护、CI 可验证、下游可复用”的距离。
 
 ## 架构模型
 
@@ -27,6 +43,8 @@ CMake 也强调 out-of-source build：源码目录保持干净，构建产物进
 - `add_executable` 创建可执行 target。
 - `target_compile_features` 要求 C++23。
 - `target_compile_definitions` 把项目版本写入编译期宏，展示 target 级配置。
+
+`src/main.cpp` 对应展示了构建信息怎样进入程序：如果 `target_compile_definitions` 正常生效，程序会输出 `project version: 1.0.0`；如果移除这条配置，源码中的 fallback 宏会让版本变成 `dev`。这比单纯讲概念更直观：CMake 不是“额外的脚本层”，它实际决定了编译器看到的语言标准、宏、头文件和链接依赖。
 
 ## 请求/执行生命周期
 

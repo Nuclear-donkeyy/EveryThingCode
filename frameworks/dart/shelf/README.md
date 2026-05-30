@@ -10,6 +10,16 @@ Shelf 不内建 ORM、模板系统、配置中心、认证体系或应用目录�
 
 本仓库版本基线是 Shelf latest stable，语言基线是 Dart 3.12.x，策略是 latest stable / officially supported，无官方 LTS 标记。
 
+## 解决的问题
+
+只用 `dart:io` 写 HTTP 服务时，开发者很快会遇到一组重复问题：底层 `HttpRequest` 和 `HttpResponse` 的读写细节会散落在业务分支里；日志、鉴权、CORS、错误处理这类横切逻辑容易复制到每个接口；JSON 编码、状态码、header 和异常转换没有统一出口；测试往往需要真的启动端口，速度慢且容易受环境影响；部署时还要重新梳理监听地址、端口、日志输出和应用装配边界。
+
+Shelf 把这些问题压缩成几个稳定抽象。`Request` 和 `Response` 统一描述 HTTP 边界，业务代码不必直接面对 socket 读写；`Handler` 把“处理一次请求”变成普通函数，便于组合和测试；`Middleware` 把日志、错误处理、鉴权、CORS、压缩、请求 id 等能力从业务 handler 中移出；`Pipeline` 明确 middleware 顺序，避免横切逻辑靠隐式约定运行；adapter 负责把同一套 Handler 接到 `dart:io`、测试或其他运行环境上。
+
+它也解决了 Dart 服务端学习里的一个常见断层：很多 Dart 使用者先接触 Flutter，熟悉 Widget、BuildContext 和状态管理，却不一定理解后端 HTTP 的请求/响应模型。Shelf 刻意保持在 Web 标准层：一次请求进来，一次响应出去，中间用函数链加工。这样读者可以把注意力放在 HTTP contract、异步 I/O、JSON 边界、错误响应和部署形态上，而不是被完整后端平台的目录、ORM 和代码生成淹没。
+
+Shelf 不试图解决所有后端问题。它不内建路由 DSL、ORM、迁移、认证、后台任务、模板系统或管理后台，因此大型业务需要主动选择配套库并沉淀工程约定。它真正解决的是“如何把 Dart 函数组织成可测试、可组合、可部署的 HTTP 服务”。
+
 ## 设计思想
 
 Shelf 的核心思想是函数组合。`Handler` 本质上是接收 `Request`、返回 `Response` 或 `Future<Response>` 的函数。业务代码可以先从一个普通函数开始，再逐步拆出 repository、service 和 JSON 编码逻辑。
@@ -19,6 +29,10 @@ Shelf 的核心思想是函数组合。`Handler` 本质上是接收 `Request`、
 `Pipeline` 把多个 Middleware 按顺序串起来。请求进入 pipeline 的第一个中间件，再层层进入最终 Handler；响应则沿相反方向返回。理解这个进入和返回方向，是读懂日志、异常处理、认证和压缩中间件顺序的关键。
 
 Shelf 鼓励显式 HTTP 组合。它不会自动扫描控制器，也不会把隐式上下文注入到方法里。你能在代码里直接看到端口从哪里来、handler 如何创建、middleware 如何排序、请求路径如何分派。这种透明度很适合学习服务端基础，也要求工程纪律。
+
+另一个重要思想是“adapter 与业务 handler 分离”。`shelf_io.serve()` 只是把 Handler 接到 `dart:io` server 上；测试可以绕过 adapter，直接构造 `Request` 调用 Handler；部署时也可以把同一个 Handler 包进不同启动方式。这个分离让 Shelf 的最小应用天然适合测试，也让云函数、容器、命令行工具和本地开发能共享同一条 HTTP 组合链。
+
+Shelf 的 JSON 处理保持显式：框架不会自动把对象序列化，也不会自动校验输入模型。quickstart 用 `jsonResponse()` 统一输出，用 `_readJsonObject()` 读取 body，再在 handler 里检查 `title`。这比全自动绑定啰嗦一点，但它让初学者清楚看到 HTTP 边界上必须处理的事情：请求体可能为空，JSON 可能不是对象，字段可能缺失，响应必须带状态码和 `content-type`。
 
 ## 架构模型
 
@@ -85,6 +99,8 @@ Shelf 的 Handler 是普通函数，因此非常适合直接测试。你可以�
 
 quickstart 的测试覆盖了列表接口、创建接口和不存在路径。它验证的是 HTTP contract，而不是内部实现细节：给定方法、路径和 JSON body，应返回什么状态码和响应内容。
 
+`package:test` 在这里承担的是服务端 contract 测试入口，而不是 Flutter 的 widget test。测试文件不需要 `flutter_test`、虚拟设备或渲染树，只关心 `Request -> Handler -> Response` 这条链。这个区别能帮助 Flutter 背景的读者建立边界：Flutter 测 UI 状态和交互，Shelf 测 HTTP 协议行为和业务响应。
+
 当服务变复杂后，可以分层测试：纯业务 service 做单元测试；handler 做 HTTP contract 测试；需要验证真实网络、数据库或容器配置时，再做集成测试。CI 中至少应运行 `dart test` 和静态分析。
 
 ## 部署方式
@@ -102,6 +118,8 @@ Shelf 本身没有部署平台绑定，可以部署到 VM、容器、Kubernetes�
 谨慎选择 Shelf 的场景包括：团队需要完整后台管理、ORM、认证、迁移、模板、代码生成和强约定项目结构；这时 Shelf 需要你自己组合很多能力，Dart Frog 或其他更完整框架可能更合适。
 
 和 Express/Koa、Go `net/http`、Python Starlette 相比，Shelf 的共同点是轻量和组合；差异在于 Dart 的类型系统、async/Future、package 生态和部署成熟度。它适合喜欢显式函数边界的团队，但不适合期待“一装即有全套后台平台”的场景。
+
+与 Flutter 的边界也要分清：Flutter 解决客户端 UI 渲染、布局、状态展示和平台适配；Shelf 解决服务端 HTTP 入口、请求解析、响应生成、中间件和部署。二者可以共享 Dart 语言、数据模型和部分工具链，但不应共享运行时假设。Flutter 的 `Widget` 不应该出现在 Shelf 服务端，Shelf 的 `Request`/`Response` 也不应该泄漏到 Flutter UI 层。
 
 ## 案例索引
 

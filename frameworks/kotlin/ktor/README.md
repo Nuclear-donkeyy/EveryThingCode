@@ -8,15 +8,35 @@ Ktor 解决的是“用 Kotlin 原生方式组合 HTTP 应用”的问题。它�
 
 Ktor 不试图成为 Spring Boot 式的大型企业平台。它不会默认给你 ORM、迁移、复杂依赖注入容器、后台任务系统或全套运维面板。它更像一组可组合的 HTTP building blocks：你负责清楚地划分业务层、数据层和配置层，Ktor 负责把请求送到正确的位置。
 
+## 解决的问题
+
+如果只用 JVM 的底层 HTTP 能力或一个很薄的 Servlet/Netty 封装来写 Kotlin 服务端，常见问题不是“不能写”，而是很多基础设施会迅速散落到业务代码里：
+
+- 请求生命周期不集中：启动 server、解析路径、读取请求体、写响应、处理异常、打日志经常分散在不同 helper 中，读者很难看出一个请求到底经过了哪些阶段。
+- 协程边界不明确：Kotlin 服务端通常需要调用数据库、RPC、HTTP client 或消息系统。如果 handler 只是普通阻塞函数，就容易把协程优势浪费掉；如果自己管理 coroutine scope，又容易出现取消、超时和资源释放不一致。
+- 路由组织缺少结构：小项目可以用一堆 `if path == ...` 或函数表，大项目会出现路径前缀重复、HTTP 方法混乱、参数解析和业务调用混在一起的问题。
+- JSON 读写重复且容易漂移：手写反序列化、校验、响应头和错误格式，会让 DTO、API 文档和实际响应慢慢不一致。
+- 横切能力缺少统一入口：日志、认证、CORS、错误映射、压缩、指标、内容协商等能力如果靠每个 handler 手写，很快就会变成重复代码。
+- 测试需要真实端口：如果框架没有内存测试宿主，HTTP 行为测试就要先启动服务、占用端口、处理并发清理，反馈慢且不稳定。
+- 框架边界过重或过隐式：有些平台提供很多默认能力，但初学者不容易看见依赖从哪里来、插件何时生效、请求如何进入业务层。
+
+Ktor 的价值正在这里：它用 `Application` 作为应用组合入口，用 `Routing` 表达 URL 到 handler 的映射，用 `Plugin` 管理横切能力，用 `ContentNegotiation` 接管 JSON 协商，用 coroutine-friendly handler 承接异步 I/O，用 `testApplication` 在内存中测试完整请求链路。它解决的不是某一个单点问题，而是让 Kotlin 后端项目的 HTTP 入口、协程模型、序列化、插件管线和测试边界都保持显式。
+
 ## 设计思想
 
-Ktor 的第一关键词是插件。应用能力通过 `install(...)` 注册，例如 `ContentNegotiation` 负责 JSON 序列化，`CallLogging` 负责请求日志，`StatusPages` 负责异常到响应的映射。插件让应用保持显式：没有安装的能力不会隐式生效。
+Ktor 的第一关键词是 `Application`。一个 Ktor 服务不是从某个巨大的默认容器开始，而是从 `Application.module` 或本仓库 quickstart 里的 `Application.taskModule(store)` 开始。这个函数就是应用装配图：安装哪些插件、暴露哪些路由、把哪些业务依赖交给 HTTP 层，都在这里可见。它解决的是“应用启动以后到底装了什么”的可理解性问题。
 
-第二关键词是 Routing DSL。`routing { route("/api") { get("/tasks") { ... } } }` 把 HTTP 方法、路径和处理逻辑放在一个 Kotlin DSL 中。DSL 不是魔法，而是 Kotlin 的 lambda with receiver、扩展函数和类型推断共同形成的可读结构。
+第二关键词是插件。应用能力通过 `install(...)` 注册，例如 `ContentNegotiation` 负责 JSON 序列化，`CallLogging` 负责请求日志，`StatusPages` 负责异常到响应的映射。插件让应用保持显式：没有安装的能力不会隐式生效。对教学尤其重要的是，插件把横切能力放进应用管线，而不是塞进每一个 route handler。
 
-第三关键词是协程。Ktor 的 handler 天然运行在 suspend 环境中，适合调用数据库、HTTP client、队列或文件 IO。你不需要为每个请求手动创建线程，也不要在 handler 中阻塞线程；真实项目应优先使用 suspend API，借助结构化并发让取消和超时自然传播。
+第三关键词是 Routing DSL。`routing { route("/api") { get("/tasks") { ... } } }` 把 HTTP 方法、路径和处理逻辑放在一个 Kotlin DSL 中。DSL 不是魔法，而是 Kotlin 的 lambda with receiver、扩展函数和类型推断共同形成的可读结构。它解决的是路由表和 handler 分离后难以追踪的问题：路径、方法、参数读取和业务调用在同一块结构化代码里完成。
 
-第四关键词是薄框架边界。Ktor handler 可以访问 `ApplicationCall`，但业务服务最好接收普通参数或 `CoroutineContext`/`context`，不要让领域模型依赖 Ktor 类型。这样将来把业务迁移到 CLI、批处理或消息消费入口时，核心逻辑仍然能复用。
+第四关键词是内容协商。HTTP API 不是简单返回字符串，而是在客户端可接受内容、请求体格式、响应格式之间做协议选择。`ContentNegotiation { json(...) }` 告诉 Ktor：收到 JSON 时如何反序列化成 `CreateTaskRequest`，返回 `Task` 或 `ErrorResponse` 时如何序列化成 JSON。这样 handler 处理 Kotlin 对象，而不是反复处理原始字符串、header 和字节流。
+
+第五关键词是协程。Ktor 的 handler 天然运行在 suspend 环境中，适合调用数据库、HTTP client、队列或文件 IO。你不需要为每个请求手动创建线程，也不要在 handler 中阻塞线程；真实项目应优先使用 suspend API，借助结构化并发让取消和超时自然传播。quickstart 的 `TaskStore` 把 `list/create/markDone` 设计成 suspend 函数，并用 `Mutex.withLock` 保护内存状态，就是为了让并发边界在最小案例中也能被看见。
+
+第六关键词是测试宿主。`testApplication` 可以把同一个 `Application.taskModule(...)` 安装到内存中的测试环境，再用 Ktor client 发出 HTTP 请求。它不是只测函数调用，而是测路由匹配、插件配置、序列化和状态码；同时又不需要真实端口。这样测试和生产共享同一套应用装配，避免“测试通过但实际 server 装配不同”的问题。
+
+最后一个关键词是薄框架边界。Ktor handler 可以访问 `ApplicationCall`，但业务服务最好接收普通参数或上下文对象，不要让领域模型依赖 Ktor 类型。这样将来把业务迁移到 CLI、批处理或消息消费入口时，核心逻辑仍然能复用。Ktor 的思想不是把一切都框架化，而是把 HTTP 入口框架化，把业务保持为普通 Kotlin。
 
 ## 架构模型
 

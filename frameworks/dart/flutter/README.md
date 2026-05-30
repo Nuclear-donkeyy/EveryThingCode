@@ -10,17 +10,35 @@ Flutter 不负责替你定义后端架构、数据库模型或业务分层。网
 
 本仓库版本基线是 Flutter 3.44 stable，语言基线是 Dart 3.12.x，策略是 latest stable / officially supported，无官方 LTS 标记。
 
+## 解决的问题
+
+Flutter 首先解决的是“同一套产品体验如何在多个客户端平台上稳定交付”。如果分别用 Android、iOS、Web 和桌面原生技术实现同一个界面，团队往往要维护多套布局、多套状态更新逻辑、多套测试和多套视觉细节。业务越快变化，平台之间越容易出现按钮间距、字体、动画、边界状态和错误提示不一致的问题。Flutter 通过自带渲染引擎、统一 Widget 体系和一套工具链，把大部分 UI 差异收敛到 Dart 代码里。
+
+第二个问题是状态和界面同步。命令式 UI 很容易变成“改数据时还要记得改这里、改那里、再改另一个角落的控件”。列表项完成、计数器更新、按钮禁用、空状态显示这些变化如果靠手动操作控件，会让状态来源越来越模糊。Flutter 用声明式 UI 把界面变成状态的函数：状态变化后重新描述 Widget tree，框架负责复用 Element、更新 RenderObject 和提交绘制。
+
+第三个问题是跨平台 UI 的像素一致性和可定制性。很多跨平台方案依赖平台原生控件，因此不同平台的控件行为、主题、动画和可组合能力都不完全一致。Flutter 选择自绘：Material/Cupertino/自定义组件都可以在同一渲染模型里工作。代价是团队必须理解 Flutter 自己的布局、绘制和语义模型，而不能完全照搬 Web CSS 或原生 View 的经验。
+
+第四个问题是复杂界面的结构化表达。真实应用不会只有一个按钮，而是有导航、主题、滚动、列表、弹窗、表单、动画、权限和平台能力。Flutter 把“可见控件”和“不可见能力”都表达为 Widget，例如 `MaterialApp`、`Scaffold`、`Theme`、`MediaQuery`、`Navigator`、`ListView` 都能进入同一棵树。这样做让组合规则统一，但也要求开发者清楚 Widget tree、Element tree 和 RenderObject tree 的职责差异。
+
+第五个问题是开发反馈和测试成本。客户端 UI 如果每次修改都要完整编译、安装、手动点一遍流程，迭代速度会很慢。Flutter 的 hot reload 让多数 UI 与状态逻辑修改可以快速注入运行中的应用；Widget test 则能在没有真机或模拟器的情况下构建 Widget tree、模拟输入并断言用户可见结果。它们解决的是“客户端 UI 难以快速验证”的问题，而不是替代所有设备级集成测试。
+
+第六个问题是平台差异的边界管理。摄像头、定位、推送、支付、原生 SDK、文件系统和系统分享仍然是平台相关能力。Flutter 通过插件、MethodChannel、EventChannel、FFI 和平台视图把这些能力接入 Dart 层。理想结构不是让 Widget 直接写平台调用，而是把平台能力封装成 service/repository，让 UI 层只依赖清晰的业务接口。
+
 ## 设计思想
 
-Flutter 的第一层思想是声明式 UI：你不直接命令按钮“把标题改成 X”，而是修改状态，然后在 `build` 方法里重新描述“当前状态下 UI 应该长什么样”。框架负责比较新旧描述、复用 Element、更新 RenderObject，并把必要部分重新布局和绘制。
+Flutter 的第一层思想是声明式 UI：你不直接命令按钮“把标题改成 X”，而是修改状态，然后在 `build` 方法里重新描述“当前状态下 UI 应该长什么样”。框架负责比较新旧描述、复用 Element、更新 RenderObject，并把必要部分重新布局和绘制。这一思想专门回应状态同步问题：代码里应该只有一个可信状态来源，UI 是这个状态的当前投影。
 
-第二层思想是组合优先。Flutter 几乎所有可见与不可见的能力都是 Widget：文本、按钮、布局、主题、路由、手势、滚动、动画、媒体查询、方向感知都通过 Widget 组合。真实项目的代码质量通常取决于你是否能把大页面拆成有明确职责的小 Widget。
+第二层思想是 Widget 是配置，Element 是实例位置，RenderObject 是布局和绘制对象。`Text`、`ListView`、`Scaffold` 这样的 Widget 本身通常很轻量、不可变，描述“要什么”；Element 把 Widget 挂到树上的具体位置，负责生命周期、脏标记和复用；RenderObject 负责 constraints、size、paint 等底层工作。理解这三者，才能明白为什么 `build()` 可以频繁执行、为什么 `Key` 会影响复用、为什么布局错误通常来自约束传播。
 
-第三层思想是状态拥有者要清楚。局部交互可以放在 `StatefulWidget` 的 `State` 中；跨页面或跨模块状态应该提升到更高层，通过 Provider、Riverpod、Bloc 或显式构造参数传递。状态放错位置会导致重建范围过大、测试困难或业务逻辑散落在 UI 里。
+第三层思想是组合优先。Flutter 几乎所有可见与不可见的能力都是 Widget：文本、按钮、布局、主题、路由、手势、滚动、动画、媒体查询、方向感知都通过 Widget 组合。真实项目的代码质量通常取决于你是否能把大页面拆成有明确职责的小 Widget：状态拥有者负责变更，展示 Widget 负责呈现，服务层负责数据或平台能力。
 
-第四层思想是约束驱动布局。Flutter 布局不是 CSS 流式模型，而是父节点把 constraints 传给子节点，子节点选择自己的 size，父节点再决定 position。理解 constraints、`Row`/`Column`、`Expanded`、`Flexible`、`ListView`、`SingleChildScrollView` 的关系，是避免布局溢出的基础。
+第四层思想是状态拥有者要清楚。局部交互可以放在 `StatefulWidget` 的 `State` 中；跨页面或跨模块状态应该提升到更高层，通过 Provider、Riverpod、Bloc 或显式构造参数传递。`StatefulWidget` 只是配置，真正保存可变数据的是 `State` 对象；`setState()` 的职责是告诉对应 Element “下一帧需要重新构建”，而不是直接操作屏幕像素。状态放错位置会导致重建范围过大、测试困难或业务逻辑散落在 UI 里。
 
-第五层思想是平台能力通过插件和平台通道接入。摄像头、定位、传感器、通知、原生 SDK 等能力通常由插件封装；需要自定义时，可以用 MethodChannel、EventChannel 或 FFI 连接原生代码。Flutter 负责 UI 与跨平台运行时，平台细节仍然需要清晰边界。
+第五层思想是 `BuildContext` 表达“当前 Widget 在树中的位置”。通过 context，Widget 可以找到主题、媒体信息、路由、InheritedWidget 或状态容器。`BuildContext` 不是全局服务定位器，而是树位置的句柄；在错误的生命周期或错误的树层级使用 context，常常会导致找不到依赖、导航异常或测试困难。
+
+第六层思想是约束驱动布局。Flutter 布局不是 CSS 流式模型，而是父节点把 constraints 传给子节点，子节点选择自己的 size，父节点再决定 position。理解 constraints、`Row`/`Column`、`Expanded`、`Flexible`、`ListView`、`SingleChildScrollView` 的关系，是避免布局溢出的基础。这个模型让布局在多平台、多屏幕尺寸下更可预测，但需要开发者主动处理可滚动区域和剩余空间。
+
+第七层思想是平台能力通过插件和平台通道接入。摄像头、定位、传感器、通知、原生 SDK 等能力通常由插件封装；需要自定义时，可以用 MethodChannel、EventChannel 或 FFI 连接原生代码。Flutter 负责 UI 与跨平台运行时，平台细节仍然需要清晰边界。大型项目应该让平台通道停留在 service 层，Widget 只关心“请求权限”“获取位置”“发起支付”这样的业务动作。
 
 ## 架构模型
 

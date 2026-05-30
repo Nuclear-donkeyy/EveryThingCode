@@ -8,15 +8,31 @@ Vapor 主要解决服务端 Web 应用中的路由、请求/响应编解码、�
 
 它不是一个“零抽象”的 HTTP 库，也不是只靠代码生成的 RPC 框架。Vapor 的价值在于提供一套完整但仍然可组合的 Web 工程骨架：`Application` 管理运行期资源，Router 分发请求，Middleware 处理横切逻辑，Fluent 处理数据库模型与迁移，Swift Package Manager 管理依赖。
 
+## 解决的问题
+
+只用 Swift 标准库或 SwiftNIO 直接写 HTTP 服务时，开发者很快会遇到一组重复问题。第一是路由问题：URL path、HTTP method、路径参数、查询参数和 handler 之间没有统一组织方式，代码容易变成一串条件分支。Vapor 用 `RoutesBuilder` 把路由声明成可组合的树，`app.grouped("api", "tasks")` 可以把同一组 API 的前缀、中间件和认证策略放在同一个边界里。
+
+第二是 Request/Response 模型问题。底层 HTTP 只知道 method、header、body 和 status code，业务代码需要的是“把 JSON body 解成 Swift 类型、把 Swift 值编码成 JSON 响应、在错误时返回正确状态码”。Vapor 的 `Request`、`Response`、`Content`、`Abort` 把这些协议细节收敛到清晰 API：handler 可以从 `req.content.decode(...)` 获得 DTO，也可以返回 `Content`、`HTTPStatus` 或手工构造的 `Response`。
+
+第三是横切逻辑问题。请求 ID、日志、CORS、认证、限流、错误处理、压缩、审计如果写在每个 handler 中，会让业务逻辑被基础设施淹没。Vapor 用 Middleware pipeline 让这些逻辑包裹请求链路：请求进入 handler 前可以检查，响应返回后可以补 header 或记录指标。这样“每个请求都要做”的事不需要散落在每个 API 里。
+
+第四是异步并发问题。服务端 Swift 运行在 SwiftNIO 的事件循环上，数据库、网络、文件和外部 API 都可能是异步 I/O。早期 `EventLoopFuture` 写法容易形成回调链；现代 Vapor 支持 `async throws` handler，让业务流程按顺序表达，同时仍然由 EventLoop 承载高并发。需要注意的是，阻塞调用仍然不能放在事件循环上，CPU 密集或阻塞 I/O 应转移到合适的执行资源。
+
+第五是配置、数据库、测试和部署问题。真实服务不只是一组路由，还要读取端口、数据库 URL、secret、日志级别，管理数据库迁移，编写 HTTP 集成测试，并在 Linux 容器中稳定运行。Vapor 用 `Application` 作为运行期资源中心，用环境配置管理运行差异，用 Fluent 表达 model、relation、query 和 migration，用 Swift Package Manager 与 release binary 支撑构建和部署。
+
 ## 设计思想
 
-Vapor 的第一层思想是路由即边界。开发者用 `app.get`、`app.post`、`grouped` 等 API 把 URL、HTTP method、认证和业务处理绑定起来。路由 handler 接收 `Request`，返回可编码对象、`Response` 或异步结果。
+Vapor 的第一层思想是应用对象统一运行期。`Application` 不是业务 service，也不是全局变量的替身，而是服务进程的组合根：它持有 event loop group、logger、middleware、routes、client、database、storage 和环境信息。应用启动时在 `Application` 上注册基础设施，应用关闭时通过 `shutdown()` 释放资源。quickstart 里的 `let app = try await Application.make(.detect())` 与 `defer { app.shutdown() }` 正是这个思想的最小形态。
 
-第二层思想是 middleware pipeline。日志、错误处理、CORS、认证、请求 ID、压缩等横切逻辑不应散落在每个 handler 中，而应作为 Middleware 包裹请求处理链。每个 Middleware 可以在请求进入业务前检查，也可以在响应返回后补充 header 或记录指标。
+第二层思想是路由即边界。开发者用 `app.get`、`app.post`、`grouped` 等 API 把 URL、HTTP method、认证和业务处理绑定起来。路由 handler 接收 `Request`，返回可编码对象、`Response`、`HTTPStatus` 或异步结果。`RoutesBuilder` 让路由可以被分组、组合和局部加中间件，因此 API 的外部形状会自然映射到代码结构。
 
-第三层思想是 async/await 优先。Vapor 早期基于 EventLoopFuture，现代写法更鼓励 `async throws` handler。开发者可以像写同步代码一样表达异步数据库、HTTP 客户端和文件操作，同时仍由 SwiftNIO 支撑高并发事件循环。
+第三层思想是协议边界类型化。`Request` 代表一次 HTTP 输入，`Response` 代表一次 HTTP 输出，`Content` 代表可以通过内容协商编码/解码的请求体或响应体。这样 handler 不必手写 JSON parsing、header 拼装和 status code 分支，也不必把数据库模型直接暴露给客户端。DTO、`Content` 与 `Abort` 共同把“协议错误”和“业务数据”分开。
 
-第四层是数据建模。Fluent 把模型、字段、关系和迁移表达成 Swift 类型。它的核心不是让开发者忘记 SQL，而是在模型与迁移之间建立统一结构，减少字符串式查询和手工迁移错误。
+第四层思想是 middleware pipeline。日志、错误处理、CORS、认证、请求 ID、压缩等横切逻辑不应散落在每个 handler 中，而应作为 Middleware 包裹请求处理链。每个 Middleware 可以在请求进入业务前检查，也可以在响应返回后补充 header 或记录指标。这个模型解决的是“同一规则应用到很多路由”的问题。
+
+第五层思想是 async/await 站在 EventLoop 之上。Vapor 早期基于 `EventLoopFuture`，现代写法更鼓励 `async throws` handler。开发者可以像写同步代码一样表达异步数据库、HTTP 客户端和文件操作，同时仍由 SwiftNIO 支撑高并发事件循环。理解这一点有助于避免在 handler 中做阻塞 I/O，也有助于判断什么时候需要保留 future API 与 NIO 生态互操作。
+
+第六层是数据建模与迁移。Fluent 把模型、字段、关系和迁移表达成 Swift 类型。它的核心不是让开发者忘记 SQL，而是在模型与迁移之间建立统一结构，减少字符串式查询和手工迁移错误。Vapor 鼓励把 Fluent model、DTO、service/repository 分开：数据库结构服务于持久化，DTO 服务于 HTTP 契约，service/repository 服务于业务规则。
 
 ## 架构模型
 

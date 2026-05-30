@@ -8,19 +8,39 @@
 
 它不替你解决 ORM、配置中心、依赖注入、参数验证、OpenAPI、认证授权和项目分层。也正因为它“不多管”，Go 项目常常把 `net/http` 当作稳定边界，在其上组合中间件、业务 service、repository、日志和配置。
 
+## 解决的问题
+
+如果不用任何第三方框架，一个 HTTP 服务至少要回答七个问题：请求如何进入程序，URL 如何匹配到处理函数，handler 如何读写协议细节，公共逻辑如何复用，请求取消和超时如何传递，依赖如何装配，以及测试如何在不真正监听端口的情况下完成。`net/http` 的价值不在于替你生成项目结构，而在于为这些问题提供一组很小、很稳定的共同语言。
+
+第一个问题是“HTTP 服务器本身”。手写 socket、解析报文、管理 keep-alive 和超时没有教学价值，也很容易出错。`http.Server` 负责监听、连接管理、请求解析和超时控制；示例里的 `main` 显式设置 `ReadHeaderTimeout`、`ReadTimeout`、`WriteTimeout`、`IdleTimeout`，让服务不会被慢客户端或悬挂连接轻易拖住。
+
+第二个问题是“请求分发”。没有路由器时，所有路径判断都会堆进一个大 `switch`，方法检查、路径参数、404/405 逻辑会很快变乱。标准库的 `ServeMux` 负责把 `GET /tasks`、`POST /tasks`、`PATCH /tasks/{id}/done` 这样的 pattern 映射到 handler；Go 1.22 之后还支持 HTTP method 和路径参数，示例用 `r.PathValue("id")` 读取任务编号。
+
+第三个问题是“协议适配和业务边界”。handler 必须接触 `http.ResponseWriter` 和 `*http.Request`，但业务逻辑不应该被 HTTP 类型污染。示例中 `createTask` 只在边界处解 JSON、校验输入、写状态码；真正的数据创建交给 `Store.Create(r.Context(), input.Title)`。这样以后把 store 换成数据库，或者把入口换成 gRPC，业务类型仍然可以保留。
+
+第四个问题是“横切逻辑”。日志、panic 恢复、超时、鉴权、CORS、request id 如果散落在每个 handler 里，会形成重复代码。标准库把一切都收敛到 `http.Handler`，所以 middleware 可以统一写成 `func(http.Handler) http.Handler`。示例里的 `timeoutMiddleware`、`recoverMiddleware`、`loggingMiddleware` 都是这种形状，它们包装 mux，却不需要知道具体路由细节。
+
+第五个问题是“请求级生命周期”。真实服务会访问数据库、缓存、外部 API；客户端断开或上游取消时，下游操作也应该停止。`*http.Request` 自带 `Context()`，示例把它继续传给 `Store`。内存 store 里只是检查 `ctx.Err()`，但这个接口形状和 `database/sql`、外部 HTTP client、消息系统非常接近。
+
+第六个问题是“可测试性”。如果框架把请求生命周期藏得太深，测试常常必须启动完整服务。`net/http` 的 handler 是普通对象，`httptest.NewRequest` 和 `httptest.NewRecorder` 可以直接驱动它。示例的 `main_test.go` 不打开端口，却覆盖了 health、create、patch 和错误输入，这正是标准库接口小带来的好处。
+
+`net/http` 的边界也要说清楚：它不会提供自动参数绑定、声明式验证、路由组、统一错误响应、依赖注入容器、OpenAPI 生成、ORM 或后台任务。示例中 JSON 解码、title 校验、路径 id 转换、错误响应都是手写的。小服务这样很清楚；当这些模式在很多 endpoint 中重复出现时，就应该抽 helper、定义项目约定，或评估 Gin、Echo、Chi 等框架。
+
 ## 设计思想
 
-`net/http` 的核心思想是接口小、组合强、依赖显式。
+`net/http` 的核心思想是接口小、组合强、依赖显式。它没有把 Web 应用塑造成一个必须继承的基类或必须遵守的目录，而是把请求处理抽象成少数几个 Go 类型，让你用普通函数、结构体和接口把程序拼起来。
 
-`http.Handler` 只有一个方法：`ServeHTTP(http.ResponseWriter, *http.Request)`。任何实现了这个方法的对象都可以处理请求。普通函数也可以通过 `http.HandlerFunc` 变成 handler。这让 handler 可以是闭包、结构体方法，也可以是带依赖的对象方法。
+第一层思想是“所有请求处理都是 handler”。`http.Handler` 只有一个方法：`ServeHTTP(http.ResponseWriter, *http.Request)`。任何实现了这个方法的对象都可以处理请求，普通函数也可以通过 `http.HandlerFunc` 变成 handler。示例里 `api.health`、`api.listTasks`、`api.createTask`、`api.markTaskDone` 是结构体方法，它们既符合 handler 形状，又能通过 `app` 访问 `store` 和 `logger`。
 
-路由由 `ServeMux` 负责。Go 1.22 之后，标准 `ServeMux` 支持带方法的 pattern，例如 `GET /tasks/{id}`，并能通过 `r.PathValue("id")` 读取路径参数。对于教学项目，这已经足够表达 REST API 的基本结构。
+第二层思想是“路由只是 handler 的分发表”。`ServeMux` 不接管你的项目结构，也不要求 controller 基类；它只负责从 method/path pattern 找到 handler。Go 1.22 之后，标准 `ServeMux` 支持带方法的 pattern，例如 `GET /tasks/{id}`，并能通过 `r.PathValue("id")` 读取路径参数。对于教学项目，这已经足够表达 REST API 的基本结构，也能让读者看清路由和业务之间的边界。
 
-中间件本质上是 `func(http.Handler) http.Handler`：接收下一个 handler，返回一个新的 handler。日志、恢复、超时、认证、CORS、request id 都可以用同一种方式串起来。这个模型不需要框架容器，也不需要隐藏生命周期，读代码时可以沿着函数包装顺序一路追下去。
+第三层思想是“组合优先于继承”。中间件本质上是 `func(http.Handler) http.Handler`：接收下一个 handler，返回一个新的 handler。日志、恢复、超时、认证、CORS、request id 都可以用同一种方式串起来。示例从 mux 开始，依次包装 `timeoutMiddleware`、`recoverMiddleware`、`loggingMiddleware`；最终交给 `http.Server` 的仍然只是一个 `http.Handler`。这个模型不需要框架容器，也不需要隐藏生命周期，读代码时可以沿着函数包装顺序一路追下去。
 
-依赖通常显式注入。示例里 `app` 持有 `Store` 和 `Logger`，`newServer` 把它们装配到 handler 上。业务函数不主动去全局变量里找数据库或配置，这样测试时可以替换为内存实现或 fake 实现。
+第四层思想是“依赖在入口装配，在边界传递”。示例里 `newServer(store, logger)` 创建 `app`，`app` 持有 `Store` 和 `Logger`，handler 通过接收者访问它们。业务函数不主动去全局变量里找数据库或配置，这样测试时可以把 logger 换成 `io.Discard`，把数据层换成内存实现或 fake 实现。Go 社区常把这种朴素的显式装配作为默认方案，只有复杂到明显痛苦时才引入 DI 工具。
 
-`context.Context` 是跨边界取消和超时的统一信号。HTTP 请求自带 context，客户端断开、服务端超时或上游取消时，业务层可以通过 `r.Context()` 感知。Go Web 项目里，context 应该传递取消、deadline、trace/request id 等请求级信息，不应该塞进大块业务对象。
+第五层思想是“context 描述请求生命周期，而不是业务参数包”。HTTP 请求自带 context，客户端断开、服务端超时或上游取消时，业务层可以通过 `r.Context()` 感知。示例中的 `timeoutMiddleware` 通过 `context.WithTimeout` 给每个请求加 deadline，`Store.List/Create/MarkDone` 先检查 `ctx.Err()`。Go Web 项目里，context 应该传递取消、deadline、trace/request id 等请求级信息，不应该塞进大块业务对象，也不应该代替显式函数参数。
+
+第六层思想是“测试同样走公开抽象”。`main_test.go` 不是绕过路由直接调用业务函数，而是用 `newServer` 得到完整 handler，再通过 `httptest` 发请求。这样测试覆盖的是生产装配后的路由、中间件和 handler 行为，同时仍然不需要真实端口、网络和第三方进程。
 
 ## 架构模型
 

@@ -6,13 +6,32 @@ Axum 是 Tokio 团队维护的 Rust Web 框架，主要解决“如何把异步 
 
 Axum 不试图成为全家桶：它不内置 ORM、不强制目录结构、不提供模板层约定，也不替你隐藏 Tokio、Serde、Tower、数据库连接池这些组成部分。它更像一层类型安全的 HTTP 组合器，把路由、请求提取、共享状态、响应转换和中间件连接起来。
 
+## 解决的问题
+
+Rust 很适合写高性能网络服务，但如果直接用 Hyper、Tokio 和若干底层 crate 拼一个 HTTP API，工程复杂度会很快暴露出来：
+
+- 路由和 handler 容易脱节：路径、HTTP method、路径参数、请求体解析散在不同位置，读代码时很难一眼看出某个接口需要哪些输入。
+- 请求解析样板代码多：每个 handler 都要重复解析 path、query、header、JSON body，并把解析失败转换为 HTTP 错误。
+- 共享状态不好表达：数据库连接池、配置、缓存、外部服务客户端需要跨 async task 共享；既要满足所有权和线程安全，又要避免把全局变量塞得到处都是。
+- 错误响应容易失控：业务错误、参数错误、JSON 解析错误、找不到资源等都要映射到状态码和响应体；如果每个 handler 自己拼响应，格式会不一致。
+- 中间件组合容易重造轮子：认证、trace、超时、限流、压缩、CORS 等横切能力不应该混进业务函数，但手写包装会让调用链变得难维护。
+- 异步运行时和 HTTP 栈需要正确接线：Tokio 负责调度 async task，Hyper 负责 HTTP，Tower 负责 service/layer 抽象；初学者容易不知道边界在哪里。
+
+Axum 的价值就在于把这些问题收敛到一套清晰的模型：`Router` 描述 API 结构，extractor 描述请求输入，`State` 描述共享依赖，`IntoResponse` 描述输出，Tower layer 描述横切能力，Tokio 负责异步执行。这样写出来的服务仍然是普通 Rust 代码，但 HTTP 边界变得可读、可测、可组合。
+
 ## 设计思想
 
-Axum 的第一思想是组合。`Router` 负责声明路径和 HTTP method，handler 是普通 async 函数，extractor 负责把请求中的 path、query、header、JSON body、共享状态提取成强类型参数。一个 handler 的签名就是它需要的输入清单，例如 `Path<u64>` 表示路径参数，`State<AppState>` 表示应用状态，`Json<CreateNote>` 表示请求体 JSON。
+Axum 的第一思想是“HTTP 结构显式组合”。`Router` 是应用的路由表，`route("/notes/{id}", get(get_note))` 同时表达了路径、method 和处理函数。大型项目可以用 `Router::merge` 或 `nest` 把模块路由组合起来，因此 API 结构不需要隐藏在宏、注解或运行时注册逻辑中。
 
-第二个思想是类型驱动。handler 返回的值只要实现 `IntoResponse`，就可以变成 HTTP 响应；提取失败时，框架会用 extractor 自己的 rejection 生成错误响应。许多“忘记解析 JSON”“路径参数类型不匹配”“状态类型不一致”的问题，会在编译期或框架边界被提前发现。
+第二个思想是“handler 签名就是接口契约”。handler 是普通 async 函数，extractor 负责把请求中的 path、query、header、JSON body 和共享状态提取成强类型参数。一个 handler 写成 `async fn get_note(Path(id): Path<u64>, State(state): State<SharedState>)`，就等于告诉读者：这个接口需要一个可解析为 `u64` 的路径参数，以及应用状态。缺字段、JSON 不合法、路径类型不匹配等问题，会在进入业务逻辑之前由 extractor 处理。
 
-第三个思想是 Tower 服务模型。Axum 的底层是 Hyper 和 Tower：一次请求会变成一个 `Service` 调用，中间件也是对服务的包装。这意味着认证、日志、超时、限流、追踪、压缩等横切能力，可以通过 Tower layer 组合到 Router 上，而不是塞进每个 handler。
+第三个思想是“共享状态显式注入”。Axum 没有传统 DI 容器，而是通过 `Router::with_state(state)` 和 `State<T>` 把配置、连接池、客户端、缓存等依赖传给 handler。Rust 的类型系统会检查 handler 需要的 state 类型是否匹配；`Arc<T>`、连接池或内部锁则负责跨任务共享。
+
+第四个思想是“响应也是类型转换”。handler 返回的值只要实现 `IntoResponse`，就可以变成 HTTP 响应；`Json<T>`、`StatusCode`、`(StatusCode, Json<T>)`、字符串、自定义错误类型都可以统一落到响应模型里。生产项目通常会定义 `AppError` 并实现 `IntoResponse`，把领域错误稳定地映射为状态码和错误 JSON。
+
+第五个思想是 Tower 服务模型。Axum 的底层是 Hyper 和 Tower：一次请求会变成一个 `Service` 调用，中间件也是对服务的包装。这意味着认证、日志、超时、限流、追踪、压缩等横切能力，可以通过 Tower layer 组合到 `Router` 上，而不是塞进每个 handler。测试时也可以直接把 `Router` 当作 Tower service 调用，不必启动真实端口。
+
+第六个思想是“不隐藏 Tokio”。入口处仍然能看到 `#[tokio::main]`、`TcpListener` 和 `axum::serve`，这让你知道服务运行在 Tokio runtime 上，也方便接入优雅停机、任务调度、异步数据库客户端和其他 Tokio 生态组件。
 
 ## 架构模型
 

@@ -27,6 +27,7 @@ LANGUAGE_INDEX_SECTIONS = [
 ]
 
 FRAMEWORK_SECTIONS = [
+    "## 解决的问题",
     "## 核心定位",
     "## 设计思想",
     "## 架构模型",

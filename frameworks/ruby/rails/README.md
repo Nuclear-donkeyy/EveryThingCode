@@ -8,13 +8,33 @@ Rails 解决的是“如何把一个 Web 产品快速、稳定地组织起来”
 
 Rails 不追求把所有选择都暴露成显式配置。它默认认为大多数业务系统有相似结构：请求进入路由，控制器协调输入输出，模型表达领域数据，视图或 JSON 呈现结果，配置按环境区分。对于初学者，最重要的是理解这些约定为什么存在，而不是一开始就绕开它们。
 
+## 解决的问题
+
+Ruby 适合写表达力很强的业务代码，但只靠 Ruby 标准库搭 Web 产品时，团队很快会遇到一组重复问题：路由表如何维护、请求参数在哪里校验、控制器是否会膨胀、数据库表结构如何演进、测试如何组织、邮件和后台任务放在哪里、上线脚本怎样保持一致。Rails 的价值不是“替你写业务”，而是把这些每个产品都会遇到的工程问题放进一套默认结构。
+
+第一类问题是 HTTP 和页面/API 的组织。如果每个接口都手写路径匹配、参数读取、JSON 序列化和状态码，很快会出现命名不统一、错误响应不统一、列表/详情/创建动作不统一的问题。Rails 用 `config/routes.rb`、RESTful resources 和控制器动作约定，把 `GET /tasks`、`POST /tasks`、`GET /tasks/:id` 这类资源操作映射到稳定命名的 action。学习者不需要先发明一套路由风格，团队也更容易在不同模块之间移动。
+
+第二类问题是业务代码的归属。没有框架约定时，数据查询、输入校验、权限判断、响应拼装容易混在同一个函数里。Rails 用 MVC 把变化原因拆开：Controller 处理 HTTP 边界，Model 管数据和领域规则，View 或 JSON serializer 负责呈现。即使 quickstart 没有模板视图，`TasksController` 与 `Task` 的分工仍然展示了 Rails 想解决的核心问题：让 HTTP 代码不要吞掉业务模型。
+
+第三类问题是数据持久化和演进。真实产品离不开数据库、关联、校验、事务和 schema 变更。手写 SQL 和迁移脚本可以工作，但很难保证团队都按同一方式做。Rails 的 Active Record 把表、对象、验证、关联、查询和 migration 连接起来，让 `Task.create!` 这类模型操作既表达业务，又能落到数据库结构。quickstart 用内存 `Task` 模拟这个接口，是为了先看懂控制器如何依赖模型，再替换成真正的 `ApplicationRecord`。
+
+第四类问题是产品周边能力。邮件、异步任务、缓存、文件上传、环境配置、日志、测试和生成器都不是“业务核心”，但每个成熟产品都需要。Rails 用 Action Mailer、Active Job、Active Storage、缓存、Minitest、generators 和统一目录解决这些周边复杂度；开发者可以先沿着默认路径交付，再在确有需要时替换组件。
+
+第五类问题是扩展和复用。大型 Rails 应用往往需要把管理后台、支付、认证、内部平台能力拆成可维护模块。Rails 通过 Railties 和 engines 允许 gem 挂载自己的配置、路由、任务、生成器和初始化逻辑。也就是说，Rails 的“约定”不只服务单个应用，也服务生态组件之间的集成。
+
 ## 设计思想
 
-Rails 的第一条思想是 convention over configuration，也就是“约定优于配置”。类名、文件路径、路由资源、控制器动作、环境配置都有稳定命名规则。框架通过这些规则自动加载代码、推断关系、提供默认行为，让开发者把注意力放在业务表达上。
+Rails 的第一条思想是 convention over configuration，也就是“约定优于配置”。类名、文件路径、路由资源、控制器动作、环境配置都有稳定命名规则。`TasksController` 放在 `app/controllers/tasks_controller.rb`，`Task` 放在 `app/models/task.rb`，Rails 就能按常量名和路径推断加载关系；`resources :tasks` 也能推导出 `index`、`show`、`create` 等动作。框架通过这些规则减少样板配置，让开发者把注意力放在业务表达上。
 
-第二条思想是 MVC。Model 负责数据和业务规则，View 负责展示，Controller 负责把 HTTP 请求翻译成一次业务操作。即便本仓库 quickstart 返回 JSON、没有模板视图，也仍然保留 MVC 的分工：`TasksController` 处理 HTTP，`Task` 表达任务数据。
+第二条思想是 MVC。Model 负责数据和业务规则，View 负责展示，Controller 负责把 HTTP 请求翻译成一次业务操作。即便本仓库 quickstart 返回 JSON、没有模板视图，也仍然保留 MVC 的分工：`TasksController` 处理 `params`、状态码和 `render json:`，`Task` 表达任务数据、查找和创建规则。这个分工的收益是，当数据层从内存数组换成数据库时，路由和 HTTP 边界不需要被重写。
 
-第三条思想是 batteries included。Rails 集成 Active Record、Action Controller、Action View、Active Job 等组件。真实项目可以只使用其中一部分，但 Rails 的学习价值在于看到一个完整 Web 应用怎样从一个入口启动，并被约定拆成可维护的层次。
+第三条思想是 Active Record 优先。Rails 默认相信多数业务系统的核心复杂度在数据模型及其关系上，所以把 ORM、验证、关联、迁移、事务和查询接口放在一条主线上。对初学者来说，重要的不是记住所有 Active Record API，而是理解“模型是业务语言的中心”：控制器发起用例，模型维护数据规则，migration 记录结构变化。
+
+第四条思想是 RESTful resources。Rails 鼓励把 URL 看成资源集合和资源成员，而不是随意命名的函数调用。`resources :tasks, only: [:index, :show, :create]` 让列表、详情、创建动作有统一形状，也让测试、权限、文档和前端调用更容易约定。
+
+第五条思想是 batteries included 与可替换边界并存。Rails 集成 Active Record、Action Controller、Action View、Action Mailer、Active Job 等组件，真实项目可以只使用其中一部分，也可以替换模板引擎、队列适配器或测试工具。Rails 的学习价值在于看到一个完整 Web 应用怎样从一个 Rack 入口启动，并被约定拆成可维护层次。
+
+第六条思想是通过 Railties 和 engines 组织生态。Rails 自身的组件就是通过 Railtie 接入应用生命周期；第三方 gem 也可以添加 initializer、rake task、generator、路由挂载和配置项。这样，认证、后台管理、支付、监控等能力可以以 Rails 风格融入应用，而不是要求团队为每个库手写胶水代码。
 
 ## 架构模型
 

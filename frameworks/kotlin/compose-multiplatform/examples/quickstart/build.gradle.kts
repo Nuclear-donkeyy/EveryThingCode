@@ -12,7 +12,7 @@ version = "0.1.0"
 kotlin {
     jvmToolchain(25)
 
-    jvm("desktop") {
+    jvm {
     }
 
     sourceSets {
@@ -26,7 +26,7 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-        val desktopMain by getting {
+        val jvmMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(compose.foundation)

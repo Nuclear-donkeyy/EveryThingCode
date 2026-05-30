@@ -84,15 +84,19 @@ java -jar target/spring-boot-quickstart-0.1.0-SNAPSHOT.jar
 
 ## 代码讲解
 
-`Application.java` 是整个应用的入口。`@SpringBootApplication` 组合了组件扫描、自动配置和配置类能力；`SpringApplication.run(...)` 会创建 Spring 应用上下文，并启动内嵌 Web 服务器。
+`Application.java` 是整个应用的入口。`@SpringBootApplication` 组合了组件扫描、自动配置和配置类能力；`SpringApplication.run(...)` 会创建 Spring 应用上下文，并启动内嵌 Web 服务器。这个文件很短，正是 Spring Boot 的核心价值之一：你不需要手写 Servlet 初始化、MVC 分发器、JSON 转换器和 Web 容器启动脚本，Boot 会根据 starter 和 classpath 给出默认装配。
 
 `Task.java` 使用 Java record 表达不可变数据载体。对于简单 DTO，record 比传统 JavaBean 更短，也天然带有构造方法、访问器、`equals` 和 `hashCode`。
 
-`TaskRepository.java` 用 `@Repository` 注册为 Spring Bean。它内部用 `ConcurrentHashMap` 保存数据，并用 `AtomicLong` 生成 id。Controller 不知道存储细节，只依赖 `findAll`、`findById` 和 `create` 这些方法，这就是数据访问边界。
+`TaskRepository.java` 用 `@Repository` 注册为 Spring Bean。它内部用 `ConcurrentHashMap` 保存数据，并用 `AtomicLong` 生成 id。Controller 不知道存储细节，只依赖 `findAll`、`findById` 和 `create` 这些方法，这就是数据访问边界。这个边界解决的是“控制器和存储实现绑死”的问题：今天仓库是内存 Map，明天可以替换成 JPA Repository、MyBatis Mapper 或远程 API client，而 Controller 的 HTTP 语义可以尽量保持稳定。
 
-`TaskController.java` 用 `@RequestMapping("/tasks")` 设置统一路径前缀，`@GetMapping` 和 `@PostMapping` 分别声明查询与创建接口。方法返回 `ResponseEntity` 时，可以同时控制状态码和响应体。
+`TaskController.java` 用 `@RequestMapping("/tasks")` 设置统一路径前缀，`@GetMapping` 和 `@PostMapping` 分别声明查询与创建接口。方法返回 `ResponseEntity` 时，可以同时控制状态码和响应体。这里体现了 Spring MVC 解决的问题：不用直接处理底层 `HttpServletRequest` 和 `HttpServletResponse`，而是把“读取路径变量”“解析 JSON body”“返回 201 Created”“不存在时返回 404”表达成清晰的 Java 方法。
 
-`TaskControllerTest.java` 使用 `MockMvc` 发起模拟 HTTP 请求。它验证的不只是 Java 方法返回值，而是包括路由匹配、JSON 序列化和 HTTP 状态码在内的 Web 层行为。
+`TaskController` 的构造函数接收 `TaskRepository`，而不是在方法里 `new TaskRepository()`。这体现了 IoC 的价值：对象的创建、生命周期和依赖装配交给 Spring 容器，业务代码只声明协作关系。等到项目变大时，你可以给 Repository 加配置、事务、缓存或替换实现，而不需要在每个 Controller 里改对象创建逻辑。
+
+`TaskControllerTest.java` 使用 `MockMvc` 发起模拟 HTTP 请求。它验证的不只是 Java 方法返回值，而是包括路由匹配、JSON 序列化和 HTTP 状态码在内的 Web 层行为。`@SpringBootTest` 会加载应用上下文，`MockMvcBuilders.webAppContextSetup(context)` 则复用真实 MVC 配置，所以测试能覆盖“Boot 自动配置 + Controller + Repository”的主链路，同时避免真实端口、外部服务器和手工启动步骤。
+
+这个 quickstart 故意没有加入数据库、认证、全局异常处理和 Actuator。它的教学重点是先看清 Spring Boot 如何解决基础设施装配问题：starter 负责依赖组合，自动配置负责默认基础设施，IoC 负责对象协作，Spring MVC 负责 HTTP 映射，Boot Test 负责把这些能力放进可重复运行的测试里。
 
 ## 延伸练习
 

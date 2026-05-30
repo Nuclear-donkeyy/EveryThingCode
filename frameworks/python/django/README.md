@@ -8,15 +8,33 @@ Django 解决的是完整 Web 应用和后台业务系统的交付问题。它�
 
 Django 不试图成为最薄的 HTTP 工具箱。只想暴露几个 JSON 接口时，FastAPI、Flask 或 Starlette 可能更轻；需要极致异步 I/O 管道时，也通常会把 Django 放在业务后台侧，而不是所有网络边界的最前面。
 
+## 解决的问题
+
+如果只用纯 Python 标准库或很轻的 Web 框架来写业务后台，第一天通常很快：定义几个路由、读 JSON、返回响应即可。真正的复杂度会在系统变成“多人维护的业务应用”后出现：URL 规则分散在各处，数据库表结构和查询逻辑缺少统一表达，新增字段后不知道谁负责迁移，后台管理页面需要重复开发，模板渲染、表单校验、权限、CSRF、防点击劫持、安全 Header、测试客户端和环境配置都要自己选型和拼装。
+
+Django 要解决的不是“如何接收一个 HTTP 请求”这个单点问题，而是“如何把一个数据驱动的后台系统长期稳定地组织起来”。它把下面这些常见痛点收进同一套官方模型：
+
+- ORM 与迁移：纯 SQL 或自选 ORM 很容易让模型定义、查询、schema 演进分散。Django 用 `models.Model` 定义领域数据，用 QuerySet 表达查询，用 migration 记录数据库结构变化。
+- Admin 后台：很多业务后台都需要运营人员查看、筛选、编辑数据。Django Admin 可以直接围绕模型生成可用后台，让团队先把精力放在业务规则上。
+- URL 与 view 约定：轻量框架中路由和处理函数容易越写越散。Django 用根 URLConf 和 app URLConf 形成清晰的请求入口树。
+- 模板与表单：服务端渲染页面时，自己拼 HTML、校验表单和展示错误很容易重复。Django 的 template、form、ModelForm 提供了统一模式。
+- 安全默认值：认证、会话、CSRF、XSS 逃逸、点击劫持防护、Host 校验等能力如果靠项目逐项补齐，遗漏成本很高。Django 把大量安全能力放入框架和中间件体系。
+- 配置与应用装配：业务增长后，哪些模块被安装、哪些 URL 被暴露、哪些中间件参与请求，都需要可审计的中心。`settings.py`、`INSTALLED_APPS`、`MIDDLEWARE` 和 `ROOT_URLCONF` 就是这套装配中心。
+- 测试约定：没有统一测试客户端时，开发者要么启动真实服务再测，要么绕开框架直接调用函数。Django 测试工具让测试以 HTTP 行为为单位，同时仍然运行得很快。
+
+本仓库 quickstart 刻意只实现内存 notes API，是为了先把“项目装配、URL 分发、view 响应、测试客户端”这条主线看清楚。真实项目加入 ORM、Admin、模板和中间件时，仍然沿着这条主线扩展，而不是换一套工程思维。
+
 ## 设计思想
 
-Django 的第一关键词是 batteries included。框架把常见 Web 能力作为官方内建能力提供，而不是要求开发者从零组合一堆插件。这样做的好处是团队协作成本低、文档统一、安全默认值更稳定；代价是你需要理解 Django 的约定和项目组织方式。
+Django 的第一关键词是 batteries included。框架把常见 Web 能力作为官方内建能力提供，而不是要求开发者从零组合一堆插件。这样做的好处是团队协作成本低、文档统一、安全默认值更稳定；代价是你需要理解 Django 的约定和项目组织方式。它的思想不是“所有东西都必须用内建方案”，而是先给业务后台一套一致、可工作的默认路径：URL、view、ORM、migration、Admin、template、form、auth、middleware、test 都能互相配合。
 
-第二个关键词是 MTV。Django 常说 Model、Template、View，而不是传统 MVC：Model 表示数据模型和业务数据边界，Template 负责展示，View 负责接收请求、调用模型或服务并返回响应。URLConf 把 URL 映射到 View，因此路由配置也是 Django 架构的一等公民。
+第二个关键词是 MTV。Django 常说 Model、Template、View，而不是传统 MVC：Model 表示数据模型和业务数据边界，Template 负责展示，View 负责接收请求、调用模型或服务并返回响应。URLConf 把 URL 映射到 View，因此路由配置也是 Django 架构的一等公民。MTV 解决的是“请求处理、数据表达、展示输出混在一起”的问题：view 不应该直接承担所有数据库细节和 HTML 拼接，model 和 template 分别承接这些职责。
 
-第三个关键词是显式应用拆分。真实 Django 项目通常由多个 app 组成，例如 `accounts`、`billing`、`catalog`。每个 app 拥有自己的模型、视图、URL、测试和管理后台注册逻辑。项目配置负责把这些 app 装配起来。
+第三个关键词是显式应用拆分。真实 Django 项目通常由多个 app 组成，例如 `accounts`、`billing`、`catalog`。每个 app 拥有自己的模型、视图、URL、测试和管理后台注册逻辑。项目配置负责把这些 app 装配起来。quickstart 中 `learn_django` 是项目层，负责 `settings.py` 和根 `urls.py`；`notes` 是业务 app，负责自己的 `urls.py`、`views.py` 和 `tests.py`。这个拆分让“全局运行方式”和“某个业务模块怎么处理请求”分开演进。
 
-第四个关键词是 Admin 与 ORM 的联动。Django ORM 不只是查询数据库，它还驱动迁移、表单、验证和 Admin 后台。很多后台系统可以先从模型定义开始，再快速得到管理界面和基础 CRUD。
+第四个关键词是 Admin 与 ORM 的联动。Django ORM 不只是查询数据库，它还驱动迁移、表单、验证和 Admin 后台。很多后台系统可以先从模型定义开始，再快速得到管理界面和基础 CRUD。也正因为 ORM 是中心，Django 项目通常会把业务数据建模放在早期：模型稳定后，迁移、Admin、表单、权限和测试数据工厂才能形成统一语言。
+
+第五个关键词是请求管线。Django 的中间件不是附属品，而是把认证、会话、安全、CSRF、压缩、日志、追踪等横切关注点放在 view 之外处理。quickstart 为了最小化把 `MIDDLEWARE = []`，这能让读者直接看到 URL 到 view 的路径；真实项目会打开安全和会话相关中间件，让每个 view 不必重复实现这些基础设施。
 
 ## 架构模型
 
@@ -27,6 +45,14 @@ Django 的第一关键词是 batteries included。框架把常见 Web 能力作�
 - 外部边界：数据库、缓存、消息队列、对象存储、第三方 API，由配置和业务服务接入。
 
 本仓库 quickstart 使用 `learn_django` 作为项目层，使用 `notes` 作为应用层。为了突出 URLConf 和 View 的关系，案例暂时把数据放在内存列表里，没有引入 ORM 和迁移。
+
+把 quickstart 对照到 Django 思想，可以这样读：
+
+- `learn_django/settings.py` 是项目装配中心：`INSTALLED_APPS = ["notes"]` 表示 notes app 参与项目，`ROOT_URLCONF = "learn_django.urls"` 表示请求入口从根 URLConf 开始。
+- `learn_django/urls.py` 是项目级路由边界：它只决定 `/api/` 交给哪个 app，不关心 notes 的内部 URL 细节。
+- `notes/urls.py` 是 app 级路由边界：它把资源路径映射到 `list_notes` 和 `note_detail`。
+- `notes/views.py` 是 View 层：读取请求、执行业务动作、返回 `JsonResponse`。未来引入 ORM 时，内存列表会迁移到 `models.py` 和 QuerySet，view 的位置不变。
+- `notes/tests.py` 是行为验证层：用 Django `Client` 模拟 HTTP 请求，验证整个 URLConf 到 view 的组合是否正确。
 
 ## 请求/执行生命周期
 
