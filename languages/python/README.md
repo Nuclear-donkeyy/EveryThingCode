@@ -61,6 +61,7 @@ Python 工程通常以 `pyproject.toml` 为中心，配合虚拟环境、格式�
 
 ## 案例索引
 
+- [特性与思想辅助教学](features/)：通过解释和可运行例子理解语言设计。
 - [hello](examples/hello/)：最小程序与运行方式，确认解释器、入口文件和输出。
 - [data-flow](examples/data-flow/)：数据建模、集合处理和函数组合，练习列表/字典、推导式和清晰函数边界。
 - [errors](examples/errors/)：错误建模、恢复和资源边界，观察异常、上下文管理器和失败路径。

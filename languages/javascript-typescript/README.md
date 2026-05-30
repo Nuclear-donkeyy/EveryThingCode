@@ -61,6 +61,7 @@ Error 对象、Promise rejection、Result 风格封装。学习时关注错误�
 
 ## 案例索引
 
+- [特性与思想辅助教学](features/)：通过解释和可运行例子理解语言设计。
 - [hello](examples/hello/)：最小程序与运行方式，确认 Node 入口、模块导入和输出。
 - [data-flow](examples/data-flow/)：数据建模、集合处理和函数组合，观察对象、数组和类型标注如何配合。
 - [errors](examples/errors/)：错误建模、恢复和资源边界，练习同步/异步错误的表达与捕获。
