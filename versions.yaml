@@ -1,0 +1,286 @@
+meta:
+  checked_at: "2026-05-30"
+  rule: "Use latest LTS/Active LTS when officially defined; otherwise use latest official stable or supported branch and mark it explicitly."
+  note: "Patch versions for framework latest-stable entries should be refreshed with package managers before production use."
+languages:
+  - id: java
+    name: "Java"
+    version: "25 LTS"
+    runtime: "JDK 25"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://www.oracle.com/java/technologies/java-se-support-roadmap.html"
+    checked_at: "2026-05-30"
+  - id: javascript-typescript
+    name: "JavaScript / TypeScript"
+    version: "Node.js 24.16.0 LTS"
+    runtime: "Node.js 24.16.0"
+    policy: "latest-active-lts"
+    lts: true
+    official_source: "https://nodejs.org/en/about/previous-releases"
+    checked_at: "2026-05-30"
+  - id: python
+    name: "Python"
+    version: "3.14.5"
+    runtime: "Python 3.14.5"
+    policy: "latest-supported-stable"
+    lts: false
+    official_source: "https://devguide.python.org/versions/"
+    checked_at: "2026-05-30"
+  - id: go
+    name: "Go"
+    version: "1.26.3"
+    runtime: "Go 1.26.3"
+    policy: "latest-supported-stable"
+    lts: false
+    official_source: "https://go.dev/doc/devel/release"
+    checked_at: "2026-05-30"
+  - id: rust
+    name: "Rust"
+    version: "1.96.x"
+    runtime: "Rust stable"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://blog.rust-lang.org/"
+    checked_at: "2026-05-30"
+  - id: csharp-dotnet
+    name: "C# / .NET"
+    version: ".NET 10.0.8 LTS"
+    runtime: ".NET SDK 10.0.8"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core"
+    checked_at: "2026-05-30"
+  - id: kotlin
+    name: "Kotlin"
+    version: "2.3.x"
+    runtime: "Kotlin 2.3"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://kotlinlang.org/docs/releases.html"
+    checked_at: "2026-05-30"
+  - id: php
+    name: "PHP"
+    version: "8.5.x"
+    runtime: "PHP 8.5"
+    policy: "latest-supported-stable"
+    lts: false
+    official_source: "https://www.php.net/supported-versions.php"
+    checked_at: "2026-05-30"
+  - id: c-cpp
+    name: "C / C++"
+    version: "C23 / C++23"
+    runtime: "C23/C++23 compiler"
+    policy: "latest-published-standards"
+    lts: false
+    official_source: "https://isocpp.org/std/the-standard"
+    checked_at: "2026-05-30"
+  - id: ruby
+    name: "Ruby"
+    version: "4.0.x"
+    runtime: "Ruby stable"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://www.ruby-lang.org/en/downloads/branches/"
+    checked_at: "2026-05-30"
+  - id: swift
+    name: "Swift"
+    version: "6.3.x"
+    runtime: "Swift 6.3"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://www.swift.org/install/"
+    checked_at: "2026-05-30"
+  - id: dart
+    name: "Dart"
+    version: "3.12.x"
+    runtime: "Dart 3.12"
+    policy: "latest-stable-no-lts"
+    lts: false
+    official_source: "https://dart.dev/get-dart/archive"
+    checked_at: "2026-05-30"
+frameworks:
+  - id: spring-boot
+    language: java
+    name: "Spring Boot"
+    version: "4.0.x"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://spring.io/projects/spring-boot"
+    checked_at: "2026-05-30"
+  - id: nextjs
+    language: javascript-typescript
+    name: "Next.js"
+    version: "16.x Active LTS"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://nextjs.org/docs"
+    checked_at: "2026-05-30"
+  - id: nestjs
+    language: javascript-typescript
+    name: "NestJS"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://docs.nestjs.com/"
+    checked_at: "2026-05-30"
+  - id: django
+    language: python
+    name: "Django"
+    version: "5.2 LTS"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://docs.djangoproject.com/en/stable/releases/"
+    checked_at: "2026-05-30"
+  - id: fastapi
+    language: python
+    name: "FastAPI"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://fastapi.tiangolo.com/"
+    checked_at: "2026-05-30"
+  - id: net-http
+    language: go
+    name: "net/http"
+    version: "Go standard library"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://pkg.go.dev/net/http"
+    checked_at: "2026-05-30"
+  - id: gin
+    language: go
+    name: "Gin"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://gin-gonic.com/docs/"
+    checked_at: "2026-05-30"
+  - id: axum
+    language: rust
+    name: "Axum"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://docs.rs/axum/latest/axum/"
+    checked_at: "2026-05-30"
+  - id: actix-web
+    language: rust
+    name: "Actix Web"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://actix.rs/"
+    checked_at: "2026-05-30"
+  - id: aspnet-core
+    language: csharp-dotnet
+    name: "ASP.NET Core"
+    version: ".NET 10.0.8 LTS"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://learn.microsoft.com/aspnet/core/"
+    checked_at: "2026-05-30"
+  - id: ktor
+    language: kotlin
+    name: "Ktor"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://ktor.io/docs/"
+    checked_at: "2026-05-30"
+  - id: compose-multiplatform
+    language: kotlin
+    name: "Compose Multiplatform"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://www.jetbrains.com/compose-multiplatform/"
+    checked_at: "2026-05-30"
+  - id: laravel
+    language: php
+    name: "Laravel"
+    version: "latest supported major"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://laravel.com/docs/releases"
+    checked_at: "2026-05-30"
+  - id: symfony
+    language: php
+    name: "Symfony"
+    version: "latest LTS line"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://symfony.com/releases"
+    checked_at: "2026-05-30"
+  - id: cmake
+    language: c-cpp
+    name: "CMake"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://cmake.org/documentation/"
+    checked_at: "2026-05-30"
+  - id: qt
+    language: c-cpp
+    name: "Qt"
+    version: "latest LTS"
+    policy: "latest-lts"
+    lts: true
+    official_source: "https://www.qt.io/product/qt6"
+    checked_at: "2026-05-30"
+  - id: boost
+    language: c-cpp
+    name: "Boost"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://www.boost.org/"
+    checked_at: "2026-05-30"
+  - id: rails
+    language: ruby
+    name: "Rails"
+    version: "latest supported series"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://rubyonrails.org/"
+    checked_at: "2026-05-30"
+  - id: sinatra
+    language: ruby
+    name: "Sinatra"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://sinatrarb.com/"
+    checked_at: "2026-05-30"
+  - id: swiftui
+    language: swift
+    name: "SwiftUI"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://developer.apple.com/xcode/swiftui/"
+    checked_at: "2026-05-30"
+  - id: vapor
+    language: swift
+    name: "Vapor"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://docs.vapor.codes/"
+    checked_at: "2026-05-30"
+  - id: flutter
+    language: dart
+    name: "Flutter"
+    version: "3.44 stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://docs.flutter.dev/release/archive"
+    checked_at: "2026-05-30"
+  - id: shelf
+    language: dart
+    name: "Shelf"
+    version: "latest stable"
+    policy: "latest-stable-or-supported"
+    lts: false
+    official_source: "https://pub.dev/packages/shelf"
+    checked_at: "2026-05-30"
